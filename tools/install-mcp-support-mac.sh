@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# MCP Client One-Click Installation Script
-# For macOS systems
+# Frevana MCP Environment Setup Script for macOS
+# Installs runtime environment for MCP plugins
 
 set -e  # Exit on any error
 
@@ -50,24 +50,17 @@ check_macos() {
     success "Detected macOS system"
 }
 
-# Check and install Xcode Command Line Tools
-install_xcode_tools() {
-    log "Checking Xcode Command Line Tools..."
+# Check if Xcode Command Line Tools are installed
+check_xcode_prerequisites() {
+    log "Checking prerequisites..."
     
     if ! xcode-select -p &> /dev/null; then
-        log "Installing Xcode Command Line Tools..."
-        xcode-select --install
-        
-        echo "Please complete the Xcode Command Line Tools installation in the popup window"
-        echo "Press any key to continue after installation is complete..."
-        read -n 1 -s
-        
-        if ! xcode-select -p &> /dev/null; then
-            error "Xcode Command Line Tools installation failed"
-            exit 1
-        fi
+        error "Xcode Command Line Tools are required but not installed"
+        echo "Please run the system setup script first:"
+        echo "bash -c \"\$(curl -fsSL [YOUR_REPO]/setup-xcode-tools-mac.sh)\""
+        exit 1
     fi
-    success "Xcode Command Line Tools ready"
+    success "Prerequisites verified"
 }
 
 # Check and install Homebrew
@@ -215,95 +208,68 @@ install_dev_tools() {
     fi
 }
 
-# Install MCP-specific packages
-install_mcp_packages() {
-    log "Installing MCP packages..."
+# Install MCP runtime environment
+install_mcp_runtime() {
+    log "Setting up MCP plugin runtime..."
     
-    # Check TypeScript
-    if ! command_exists tsc; then
-        log "Installing TypeScript globally..."
-        npm install -g typescript
-    else
-        log "TypeScript already installed: $(tsc --version | cut -d' ' -f2)"
-    fi
-    
-    # Check MCP SDK
+    # Check MCP SDK (needed for plugin communication)
     if ! npm list -g @modelcontextprotocol/sdk &> /dev/null; then
-        log "Installing MCP SDK..."
+        log "Installing MCP plugin framework..."
         npm install -g @modelcontextprotocol/sdk
     else
-        log "MCP SDK already installed"
+        log "MCP plugin framework ready"
     fi
     
-    # Check Python MCP package
+    # Check Python MCP package (for Python-based plugins)
     if ! pip3 show mcp &> /dev/null; then
-        log "Installing Python MCP package..."
+        log "Installing Python MCP support..."
         pip3 install mcp
     else
-        log "Python MCP package already installed"
+        log "Python MCP support ready"
     fi
     
-    success "MCP packages ready"
+    success "MCP plugin environment configured"
 }
 
 # Print installation summary
 print_summary() {
     echo
     echo "=================================================="
-    echo -e "${GREEN}🎉 MCP Client Environment Ready!${NC}"
+    echo -e "${GREEN}🎉 Frevana MCP Environment Ready!${NC}"
     echo "=================================================="
     echo
-    echo "Environment components:"
+    echo "Runtime environment:"
     if command_exists node; then
-        echo "✅ Node.js $(node --version)"
-        echo "✅ npm $(npm --version)"
+        echo "✅ Node.js $(node --version) - for JavaScript plugins"
+        echo "✅ npm $(npm --version) - for plugin management"
     fi
     if command_exists python3; then
-        echo "✅ Python $(python3 --version | cut -d' ' -f2)"
-        echo "✅ pip $(pip3 --version | cut -d' ' -f2)"
+        echo "✅ Python $(python3 --version | cut -d' ' -f2) - for Python plugins"
+        echo "✅ pip $(pip3 --version | cut -d' ' -f2) - for Python packages"
     fi
-    if command_exists tsc; then
-        echo "✅ TypeScript $(tsc --version | cut -d' ' -f2)"
-    fi
-    echo "✅ MCP SDK installed"
-    echo "✅ Development tools ready"
+    echo "✅ MCP Plugin Framework - ready to use"
+    echo "✅ System tools - configured"
     echo
-    echo "You can now start developing your MCP client!"
-    echo
-    echo "Quick start:"
-    echo "1. mkdir my-mcp-client && cd my-mcp-client"
-    echo "2. npm init -y"
-    echo "3. npm install @modelcontextprotocol/sdk"
-    echo
-    echo "For more information:"
-    echo "🔗 https://modelcontextprotocol.io"
+    echo "🚀 You can now add MCP plugins to Frevana!"
     echo "=================================================="
 }
 
 # Main installation function
 main() {
     echo "=================================================="
-    echo "🚀 MCP Client Environment Installer"
+    echo "🔌 Frevana MCP Environment Setup"
     echo "=================================================="
-    echo "Minimum requirements:"
-    echo "• Node.js >= $MIN_NODE_VERSION"
-    echo "• Python >= $MIN_PYTHON_VERSION"
-    echo "• Homebrew >= $MIN_HOMEBREW_VERSION"
+    echo "Installing MCP plugin runtime for Frevana..."
     echo
-    echo "This installer will check existing installations"
-    echo "and only install/upgrade what's necessary."
-    echo
-    echo "Press Enter to continue or Ctrl+C to cancel..."
-    read
     
     # Run installation steps
     check_macos
-    install_xcode_tools
+    check_xcode_prerequisites
     install_homebrew
     install_nodejs
     install_python
     install_dev_tools
-    install_mcp_packages
+    install_mcp_runtime
     print_summary
 }
 
