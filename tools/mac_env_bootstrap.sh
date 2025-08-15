@@ -5,6 +5,13 @@
 
 set -e  # Exit on any error
 
+# ================================
+# MINIMUM VERSION REQUIREMENTS
+# ================================
+MIN_NODE_VERSION="18.0.0"
+MIN_PYTHON_VERSION="3.8.0"
+MIN_HOMEBREW_VERSION="3.0.0"
+
 # Color definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -29,6 +36,11 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Version comparison function
+version_ge() {
+    printf '%s\n%s\n' "$2" "$1" | sort -V -C
+}
+
 # Check if running on macOS
 check_macos() {
     if [[ "$OSTYPE" != "darwin"* ]]; then
@@ -46,25 +58,33 @@ install_xcode_tools() {
         log "Installing Xcode Command Line Tools..."
         xcode-select --install
         
-        # Wait for user to complete installation
         echo "Please complete the Xcode Command Line Tools installation in the popup window"
         echo "Press any key to continue after installation is complete..."
         read -n 1 -s
         
-        # Verify installation
         if ! xcode-select -p &> /dev/null; then
             error "Xcode Command Line Tools installation failed"
             exit 1
         fi
     fi
-    success "Xcode Command Line Tools installed"
+    success "Xcode Command Line Tools ready"
 }
 
 # Check and install Homebrew
 install_homebrew() {
     log "Checking Homebrew..."
     
-    if ! command -v brew &> /dev/null; then
+    if command -v brew &> /dev/null; then
+        CURRENT_BREW_VERSION=$(brew --version | head -n1 | sed 's/Homebrew //')
+        if version_ge "$CURRENT_BREW_VERSION" "$MIN_HOMEBREW_VERSION"; then
+            success "Homebrew $CURRENT_BREW_VERSION meets requirements (>= $MIN_HOMEBREW_VERSION)"
+            return
+        else
+            warn "Homebrew $CURRENT_BREW_VERSION is below minimum required version $MIN_HOMEBREW_VERSION"
+            log "Updating Homebrew..."
+            brew update
+        fi
+    else
         log "Installing Homebrew..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         
@@ -72,39 +92,45 @@ install_homebrew() {
         if [[ -f "/opt/homebrew/bin/brew" ]]; then
             echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
             eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [[ -f "/usr/local/bin/brew" ]]; then
+            echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.zprofile
+            export PATH="/usr/local/bin:$PATH"
         fi
         
-        # Verify installation
         if ! command -v brew &> /dev/null; then
             error "Homebrew installation failed"
             exit 1
         fi
     fi
-    success "Homebrew installed"
+    success "Homebrew ready"
 }
 
 # Install Node.js using Homebrew
 install_nodejs() {
     log "Checking Node.js..."
     
-    if ! command -v node &> /dev/null; then
-        log "Installing Node.js..."
-        brew install node
+    if command -v node &> /dev/null; then
+        CURRENT_NODE_VERSION=$(node --version | sed 's/v//')
+        if version_ge "$CURRENT_NODE_VERSION" "$MIN_NODE_VERSION"; then
+            success "Node.js $CURRENT_NODE_VERSION meets requirements (>= $MIN_NODE_VERSION)"
+            return
+        else
+            warn "Node.js $CURRENT_NODE_VERSION is below minimum required version $MIN_NODE_VERSION"
+        fi
+    fi
+    
+    log "Installing/updating Node.js..."
+    if brew list node &> /dev/null; then
+        brew upgrade node
     else
-        log "Node.js already installed, checking version..."
-        NODE_VERSION=$(node --version)
-        log "Current Node.js version: $NODE_VERSION"
-        
-        # Update to latest LTS if needed
-        warn "Updating Node.js to latest version..."
-        brew upgrade node || true
+        brew install node
     fi
     
     # Verify installation
     if command -v node &> /dev/null && command -v npm &> /dev/null; then
         NODE_VERSION=$(node --version)
         NPM_VERSION=$(npm --version)
-        success "Node.js $NODE_VERSION and npm $NPM_VERSION installed"
+        success "Node.js $NODE_VERSION and npm $NPM_VERSION ready"
     else
         error "Node.js installation verification failed"
         exit 1
@@ -115,167 +141,141 @@ install_nodejs() {
 install_python() {
     log "Checking Python..."
     
-    # Install Python 3 if not available
-    if ! command -v python3 &> /dev/null; then
-        log "Installing Python 3..."
-        brew install python
-    else
-        PYTHON_VERSION=$(python3 --version)
-        log "Python already installed: $PYTHON_VERSION"
-        
-        # Update if needed
-        warn "Updating Python to latest version..."
+    if command -v python3 &> /dev/null; then
+        CURRENT_PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
+        if version_ge "$CURRENT_PYTHON_VERSION" "$MIN_PYTHON_VERSION"; then
+            success "Python $CURRENT_PYTHON_VERSION meets requirements (>= $MIN_PYTHON_VERSION)"
+            return
+        else
+            warn "Python $CURRENT_PYTHON_VERSION is below minimum required version $MIN_PYTHON_VERSION"
+        fi
+    fi
+    
+    log "Installing/updating Python..."
+    if brew list python@3.12 &> /dev/null || brew list python &> /dev/null; then
         brew upgrade python || true
+    else
+        brew install python
     fi
     
     # Verify installation
     if command -v python3 &> /dev/null && command -v pip3 &> /dev/null; then
         PYTHON_VERSION=$(python3 --version)
         PIP_VERSION=$(pip3 --version | cut -d' ' -f2)
-        success "Python 3 ($PYTHON_VERSION) and pip ($PIP_VERSION) installed"
+        success "Python ($PYTHON_VERSION) and pip ($PIP_VERSION) ready"
     else
         error "Python installation verification failed"
         exit 1
     fi
 }
 
-# Install additional tools for MCP development
-install_mcp_tools() {
-    log "Installing MCP development tools..."
-    
-    # Install TypeScript globally
-    log "Installing TypeScript..."
-    npm install -g typescript
-    
-    # Install common MCP packages
-    log "Installing MCP SDK and tools..."
-    npm install -g @modelcontextprotocol/sdk
-    
-    # Install Python MCP package
-    log "Installing Python MCP package..."
-    pip3 install mcp
-    
-    # Install development tools
-    log "Installing development utilities..."
-    brew install git curl wget jq
-    
-    success "MCP development tools installed"
+# Check if a command exists and is accessible
+command_exists() {
+    command -v "$1" &> /dev/null
 }
 
-# Setup development environment
-setup_dev_environment() {
-    log "Setting up development environment..."
+# Install development tools (only if not present)
+install_dev_tools() {
+    log "Checking development tools..."
     
-    # Create MCP projects directory
-    MCP_DIR="$HOME/mcp-projects"
-    if [ ! -d "$MCP_DIR" ]; then
-        mkdir -p "$MCP_DIR"
-        log "Created MCP projects directory: $MCP_DIR"
+    TOOLS_TO_INSTALL=()
+    
+    # Check each tool individually
+    if ! command_exists git; then
+        TOOLS_TO_INSTALL+=("git")
+    else
+        log "git already installed: $(git --version | cut -d' ' -f3)"
     fi
     
-    # Create a sample MCP client project
-    log "Creating sample MCP client project..."
-    cd "$MCP_DIR"
-    
-    if [ ! -d "sample-mcp-client" ]; then
-        mkdir sample-mcp-client
-        cd sample-mcp-client
-        
-        # Initialize npm project
-        npm init -y
-        
-        # Install MCP dependencies
-        npm install @modelcontextprotocol/sdk
-        npm install --save-dev typescript @types/node
-        
-        # Create basic TypeScript config
-        cat > tsconfig.json << 'EOF'
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
-}
-EOF
-        
-        # Create source directory and sample file
-        mkdir -p src
-        cat > src/client.ts << 'EOF'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-
-// Sample MCP client implementation
-class MCPClient {
-  private client: Client;
-  
-  constructor() {
-    const transport = new StdioClientTransport({
-      command: 'node',
-      args: ['path/to/your/server.js']
-    });
-    
-    this.client = new Client({
-      name: "sample-client",
-      version: "1.0.0"
-    }, {
-      capabilities: {}
-    });
-  }
-  
-  async connect() {
-    await this.client.connect(transport);
-    console.log('Connected to MCP server');
-  }
-  
-  async listTools() {
-    const result = await this.client.listTools();
-    console.log('Available tools:', result.tools);
-    return result.tools;
-  }
-}
-
-export default MCPClient;
-EOF
-        
-        success "Sample MCP client project created in $MCP_DIR/sample-mcp-client"
+    if ! command_exists curl; then
+        TOOLS_TO_INSTALL+=("curl")
+    else
+        log "curl already installed: $(curl --version | head -n1 | cut -d' ' -f2)"
     fi
+    
+    if ! command_exists wget; then
+        TOOLS_TO_INSTALL+=("wget")
+    else
+        log "wget already installed: $(wget --version | head -n1 | cut -d' ' -f3)"
+    fi
+    
+    if ! command_exists jq; then
+        TOOLS_TO_INSTALL+=("jq")
+    else
+        log "jq already installed: $(jq --version | sed 's/jq-//')"
+    fi
+    
+    # Install only missing tools
+    if [ ${#TOOLS_TO_INSTALL[@]} -gt 0 ]; then
+        log "Installing missing tools: ${TOOLS_TO_INSTALL[*]}"
+        brew install "${TOOLS_TO_INSTALL[@]}"
+        success "Development tools installed"
+    else
+        success "All development tools already available"
+    fi
+}
+
+# Install MCP-specific packages
+install_mcp_packages() {
+    log "Installing MCP packages..."
+    
+    # Check TypeScript
+    if ! command_exists tsc; then
+        log "Installing TypeScript globally..."
+        npm install -g typescript
+    else
+        log "TypeScript already installed: $(tsc --version | cut -d' ' -f2)"
+    fi
+    
+    # Check MCP SDK
+    if ! npm list -g @modelcontextprotocol/sdk &> /dev/null; then
+        log "Installing MCP SDK..."
+        npm install -g @modelcontextprotocol/sdk
+    else
+        log "MCP SDK already installed"
+    fi
+    
+    # Check Python MCP package
+    if ! pip3 show mcp &> /dev/null; then
+        log "Installing Python MCP package..."
+        pip3 install mcp
+    else
+        log "Python MCP package already installed"
+    fi
+    
+    success "MCP packages ready"
 }
 
 # Print installation summary
 print_summary() {
     echo
     echo "=================================================="
-    echo -e "${GREEN}🎉 MCP Client Environment Setup Complete!${NC}"
+    echo -e "${GREEN}🎉 MCP Client Environment Ready!${NC}"
     echo "=================================================="
     echo
-    echo "Installed components:"
-    echo "✅ Xcode Command Line Tools"
-    echo "✅ Homebrew"
-    echo "✅ Node.js $(node --version)"
-    echo "✅ npm $(npm --version)"
-    echo "✅ Python $(python3 --version | cut -d' ' -f2)"
-    echo "✅ pip $(pip3 --version | cut -d' ' -f2)"
-    echo "✅ TypeScript $(tsc --version | cut -d' ' -f2)"
-    echo "✅ MCP SDK and tools"
-    echo "✅ Development utilities (git, curl, wget, jq)"
+    echo "Environment components:"
+    if command_exists node; then
+        echo "✅ Node.js $(node --version)"
+        echo "✅ npm $(npm --version)"
+    fi
+    if command_exists python3; then
+        echo "✅ Python $(python3 --version | cut -d' ' -f2)"
+        echo "✅ pip $(pip3 --version | cut -d' ' -f2)"
+    fi
+    if command_exists tsc; then
+        echo "✅ TypeScript $(tsc --version | cut -d' ' -f2)"
+    fi
+    echo "✅ MCP SDK installed"
+    echo "✅ Development tools ready"
     echo
-    echo "Sample project location:"
-    echo "📁 $HOME/mcp-projects/sample-mcp-client"
+    echo "You can now start developing your MCP client!"
     echo
-    echo "Next steps:"
-    echo "1. cd ~/mcp-projects/sample-mcp-client"
-    echo "2. npm run build (after setting up build script)"
-    echo "3. Start developing your MCP client!"
+    echo "Quick start:"
+    echo "1. mkdir my-mcp-client && cd my-mcp-client"
+    echo "2. npm init -y"
+    echo "3. npm install @modelcontextprotocol/sdk"
     echo
-    echo "For more information, visit:"
+    echo "For more information:"
     echo "🔗 https://modelcontextprotocol.io"
     echo "=================================================="
 }
@@ -285,13 +285,13 @@ main() {
     echo "=================================================="
     echo "🚀 MCP Client Environment Installer"
     echo "=================================================="
-    echo "This script will install and configure:"
-    echo "• Xcode Command Line Tools"
-    echo "• Homebrew"
-    echo "• Node.js & npm"
-    echo "• Python 3 & pip"
-    echo "• MCP SDK and development tools"
-    echo "• Sample MCP client project"
+    echo "Minimum requirements:"
+    echo "• Node.js >= $MIN_NODE_VERSION"
+    echo "• Python >= $MIN_PYTHON_VERSION"
+    echo "• Homebrew >= $MIN_HOMEBREW_VERSION"
+    echo
+    echo "This installer will check existing installations"
+    echo "and only install/upgrade what's necessary."
     echo
     echo "Press Enter to continue or Ctrl+C to cancel..."
     read
@@ -302,8 +302,8 @@ main() {
     install_homebrew
     install_nodejs
     install_python
-    install_mcp_tools
-    setup_dev_environment
+    install_dev_tools
+    install_mcp_packages
     print_summary
 }
 
