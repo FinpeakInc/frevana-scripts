@@ -91,6 +91,15 @@ git clone https://github.com/Homebrew/brew.git "$frevana_brew_path"
 mkdir -p "$FREVANA_HOME/bin"
 ln -sf "$frevana_brew_path/bin/brew" "$FREVANA_HOME/bin/brew"
 
+# If we used a temporary link, create correct links using original path
+if [ -n "$TEMP_LINK" ]; then
+    echo "🔗 Creating final links using original path..."
+    original_brew_path="${frevana_brew_path/$TEMP_LINK/$HOME/Library/Application Support}"
+    mkdir -p "$(dirname "$ORIGINAL_FREVANA_HOME/bin/brew")"
+    ln -sf "$original_brew_path/bin/brew" "$ORIGINAL_FREVANA_HOME/bin/brew"
+    echo "   → Final brew link: $ORIGINAL_FREVANA_HOME/bin/brew"
+fi
+
 # Verify installation
 if "$frevana_brew_path/bin/brew" --version >/dev/null 2>&1; then
     brew_version=$("$frevana_brew_path/bin/brew" --version | head -n1)
