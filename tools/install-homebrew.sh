@@ -13,13 +13,13 @@ BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/head
 get_default_frevana_home() {
     case "$OSTYPE" in
         "darwin"*)
-            echo "$HOME/.frevana/mcp-tools"
+            echo "$HOME/.frevana"
             ;;
         "msys" | "cygwin" | "win32")
-            echo "$HOME/.frevana/mcp-tools"
+            echo "$HOME/.frevana"
             ;;
         *)
-            echo "$HOME/.frevana/mcp-tools"
+            echo "$HOME/.frevana"
             ;;
     esac
 }

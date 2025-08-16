@@ -19,13 +19,13 @@ URL_HOMEBREW="$BASE_URL/tools/install-homebrew.sh"
 get_default_frevana_home() {
     case "$OSTYPE" in
         "darwin"*)
-            echo "$HOME/.frevana/mcp-tools"
+            echo "$HOME/.frevana"
             ;;
         "msys" | "cygwin" | "win32")
-            echo "$HOME/.frevana/mcp-tools"
+            echo "$HOME/.frevana"
             ;;
         *)
-            echo "$HOME/.frevana/mcp-tools"
+            echo "$HOME/.frevana"
             ;;
     esac
 }
