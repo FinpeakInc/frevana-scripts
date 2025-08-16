@@ -36,7 +36,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scrip
   "current_version": "",
   "required_version": "",
   "message": "python3 not found in FREVANA_HOME",
-  "install_url": "https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/tools/install-python.sh",
+  "install_url": "https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/installers/install-python.sh",
   "command_path": ""
 }
 ```
@@ -52,10 +52,10 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scrip
 
 ```bash
 # 安装默认Python版本
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/tools/install-python.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/installers/install-python.sh)"
 
 # 安装满足特定版本要求的Python
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/tools/install-python.sh)" -- --min-version="3.12.0"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/installers/install-python.sh)" -- --min-version="3.12.0"
 ```
 
 ### install-node.sh 参数
@@ -65,10 +65,10 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scrip
 
 ```bash
 # 安装最新Node.js版本
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/tools/install-node.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/installers/install-node.sh)"
 
 # 安装满足特定版本要求的Node.js
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/tools/install-node.sh)" -- --min-version="20.0.0"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/installers/install-node.sh)" -- --min-version="20.0.0"
 ```
 
 ### install-homebrew.sh 参数
@@ -77,7 +77,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scrip
 
 ```bash
 # 安装Homebrew
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/tools/install-homebrew.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/installers/install-homebrew.sh)"
 ```
 
 ### install-uv.sh 参数
@@ -86,5 +86,5 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scrip
 
 ```bash
 # 安装UV
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/tools/install-uv.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master/installers/install-uv.sh)"
 ```

@@ -51,14 +51,14 @@ check_homebrew() {
     export HOMEBREW_NO_ENV_HINTS=1
     
     if command -v curl &> /dev/null; then
-        if bash -c "$(curl -fsSL "$BASE_URL/tools/install-homebrew.sh")" >/dev/null 2>&1; then
+        if bash -c "$(curl -fsSL "$BASE_URL/installers/install-homebrew.sh")" >/dev/null 2>&1; then
             echo "✅ Homebrew installed successfully!" >&2
         else
             echo "❌ Error: Failed to install Homebrew" >&2
             return 1
         fi
     elif command -v wget &> /dev/null; then
-        if bash -c "$(wget -qO- "$BASE_URL/tools/install-homebrew.sh")" >/dev/null 2>&1; then
+        if bash -c "$(wget -qO- "$BASE_URL/installers/install-homebrew.sh")" >/dev/null 2>&1; then
             echo "✅ Homebrew installed successfully!" >&2
         else
             echo "❌ Error: Failed to install Homebrew" >&2

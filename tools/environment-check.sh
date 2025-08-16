@@ -9,10 +9,10 @@ set -e
 # INSTALLATION URLS
 # ================================
 BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
-URL_NODE="$BASE_URL/tools/install-node.sh"
-URL_PYTHON="$BASE_URL/tools/install-python.sh"
-URL_HOMEBREW="$BASE_URL/tools/install-homebrew.sh"
-URL_UV="$BASE_URL/tools/install-uv.sh"
+URL_NODE="$BASE_URL/installers/install-node.sh"
+URL_PYTHON="$BASE_URL/installers/install-python.sh"
+URL_HOMEBREW="$BASE_URL/installers/install-homebrew.sh"
+URL_UV="$BASE_URL/installers/install-uv.sh"
 
 # ================================
 # FREVANA ENVIRONMENT SETUP
