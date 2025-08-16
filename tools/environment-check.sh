@@ -153,6 +153,30 @@ get_dependencies() {
             # No dependencies needed since these are system-level tools
             log "git is a system tool, no dependencies needed"
             ;;
+        # Common Python tools that require Python and pip
+        "uvx"|"uv"|"poetry"|"black"|"pytest"|"mypy"|"flake8"|"bandit")
+            log "$cmd is a Python tool, checking Python dependencies"
+            if [ ! -x "$FREVANA_HOME/bin/python3" ]; then
+                log "Adding python3 to dependency chain"
+                deps+=("python3")
+            fi
+            if [ ! -x "$FREVANA_HOME/bin/pip3" ]; then
+                log "Adding pip3 to dependency chain"
+                deps+=("pip3")
+            fi
+            ;;
+        # Common Node.js tools that require Node.js and npm
+        "eslint"|"prettier"|"typescript"|"ts-node"|"webpack"|"vite")
+            log "$cmd is a Node.js tool, checking Node.js dependencies"
+            if [ ! -x "$FREVANA_HOME/bin/node" ]; then
+                log "Adding node to dependency chain"
+                deps+=("node")
+            fi
+            if [ ! -x "$FREVANA_HOME/bin/npm" ]; then
+                log "Adding npm to dependency chain"
+                deps+=("npm")
+            fi
+            ;;
         *)
             # Only check package manager dependencies if explicitly specified
             if [ -n "$PACKAGE_MANAGER" ]; then
