@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check if Homebrew is available
+# Check if Homebrew is available, install if missing
 check_homebrew() {
     local brew_cmd="$FREVANA_HOME/bin/brew"
     
@@ -56,9 +56,40 @@ check_homebrew() {
         return 0
     fi
     
-    echo "❌ Error: Homebrew not found at $brew_cmd" >&2
-    echo "Please install Homebrew first using: bash tools/install-homebrew.sh" >&2
-    exit 1
+    echo "🔍 Homebrew not found at $brew_cmd"
+    echo "📥 Installing Homebrew automatically..."
+    
+    # Install Homebrew using the install script
+    BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
+    export FREVANA_HOME="$FREVANA_HOME"
+    
+    if command -v curl &> /dev/null; then
+        if bash -c "$(curl -fsSL "$BASE_URL/tools/install-homebrew.sh")"; then
+            echo "✅ Homebrew installed successfully!"
+        else
+            echo "❌ Error: Failed to install Homebrew" >&2
+            exit 1
+        fi
+    elif command -v wget &> /dev/null; then
+        if bash -c "$(wget -qO- "$BASE_URL/tools/install-homebrew.sh")"; then
+            echo "✅ Homebrew installed successfully!"
+        else
+            echo "❌ Error: Failed to install Homebrew" >&2
+            exit 1
+        fi
+    else
+        echo "❌ Error: Neither curl nor wget found" >&2
+        exit 1
+    fi
+    
+    # Verify Homebrew is now available
+    if [ -x "$brew_cmd" ]; then
+        echo "$brew_cmd"
+        return 0
+    else
+        echo "❌ Error: Homebrew installation failed" >&2
+        exit 1
+    fi
 }
 
 # Select appropriate Python version based on minimum requirement
