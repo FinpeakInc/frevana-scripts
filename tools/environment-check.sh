@@ -13,6 +13,27 @@ URL_NODE="$BASE_URL/tools/install-node.sh"
 URL_PYTHON="$BASE_URL/tools/install-python.sh"
 URL_HOMEBREW="$BASE_URL/tools/install-homebrew.sh"
 
+# ================================
+# FREVANA ENVIRONMENT SETUP
+# ================================
+get_default_frevana_home() {
+    case "$OSTYPE" in
+        "darwin"*)
+            echo "$HOME/.frevana/mcp-tools"
+            ;;
+        "msys" | "cygwin" | "win32")
+            echo "$HOME/.frevana/mcp-tools"
+            ;;
+        *)
+            echo "$HOME/.frevana/mcp-tools"
+            ;;
+    esac
+}
+
+if [ -z "$FREVANA_HOME" ]; then
+    FREVANA_HOME=$(get_default_frevana_home)
+fi
+
 # Default values
 COMMAND=""
 MIN_VERSION=""
