@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Python Installer for macOS ARM64
-# This script simulates the actual installation process with echo
+# Python Downloader for macOS ARM64
+# This script only handles downloading Python package
 
 set -e
 
@@ -20,39 +20,46 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "🐍 Starting Python installation for macOS ARM64..."
-if [ -n "$min_version" ]; then
-    echo "📋 Minimum version required: $min_version"
+# FREVANA_HOME should be set by the calling script
+if [ -z "$FREVANA_HOME" ]; then
+    echo "❌ Error: FREVANA_HOME not set" >&2
+    exit 1
 fi
-echo ""
-
-echo "📋 Installation Steps:"
-echo "1. 🔍 Checking for existing Python installation..."
-echo "   → Existing version found: $(python3 --version 2>/dev/null || echo 'None')"
 
 # Determine target version based on requirement
 target_version="3.12.2"
 if [ -n "$min_version" ]; then
-    echo "2. 🎯 Determining target version..."
-    echo "   → Required: $min_version"
-    echo "   → Target: $target_version (latest stable >= $min_version)"
+    echo "🎯 Target version: $target_version (>= $min_version)"
 else
-    echo "2. 🎯 Using latest stable version: $target_version"
+    echo "🎯 Using latest stable version: $target_version"
 fi
 
-echo "3. 📥 Downloading Python v$target_version for macOS ARM64..."
-echo "   → URL: https://www.python.org/ftp/python/$target_version/python-$target_version-macos11.pkg"
-echo "4. 📦 Installing Python package..."
-echo "   → sudo installer -pkg python-$target_version-macos11.pkg -target /"
-echo "5. 🔗 Creating symbolic links..."
-echo "   → ln -sf /usr/local/bin/python3 /usr/local/bin/python"
-echo "6. ✅ Verifying installation..."
-echo "   → Python version: $target_version"
-echo "   → pip version: 24.0"
+# Download URLs for macOS (使用GitHub上的预编译Python或其他源)
+# 使用python-build-standalone的预编译版本
+download_url="https://github.com/astral-sh/python-build-standalone/releases/download/20231002/cpython-$target_version+20231002-aarch64-apple-darwin-install_only.tar.gz"
+output_file="$FREVANA_HOME/tmp/python-$target_version-macos-arm64.tar.gz"
 
-echo "✅ Python installation completed successfully!"
-echo "🎉 You can now use 'python3' and 'pip3' commands"
-echo ""
-echo "To get started:"
-echo "  python3 --version"
-echo "  pip3 --version"
+echo "📥 Downloading Python v$target_version package for macOS ARM64..."
+echo "   → URL: $download_url"
+echo "   → Output: $output_file"
+
+# Download the file
+if command -v curl &> /dev/null; then
+    curl -fsSL "$download_url" -o "$output_file"
+elif command -v wget &> /dev/null; then
+    wget -q "$download_url" -O "$output_file"
+else
+    echo "❌ Error: Neither curl nor wget found" >&2
+    exit 1
+fi
+
+# Verify download
+if [ -f "$output_file" ]; then
+    file_size=$(stat -f%z "$output_file" 2>/dev/null || du -b "$output_file" | cut -f1)
+    echo "✅ Download completed successfully!"
+    echo "   → File size: $(echo $file_size | awk '{printf "%.2f MB", $1/1024/1024}')"
+    echo "   → Location: $output_file"
+else
+    echo "❌ Error: Download failed" >&2
+    exit 1
+fi
