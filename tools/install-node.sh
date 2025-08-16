@@ -46,6 +46,38 @@ check_homebrew() {
     exit 1
 }
 
+# Select appropriate Node.js version based on minimum requirement
+select_node_version() {
+    local min_version="$1"
+    
+    if [ -z "$min_version" ]; then
+        echo "node"  # Latest version
+        return
+    fi
+    
+    # Parse major version from min_version
+    local major_version=$(echo "$min_version" | cut -d'.' -f1)
+    
+    case "$major_version" in
+        "22"*|"23"*|"24"*)
+            echo "node@22"
+            ;;
+        "20"*|"21"*)
+            echo "node@20"
+            ;;
+        "18"*|"19"*)
+            echo "node@18"
+            ;;
+        "16"*|"17"*)
+            echo "node@16"
+            ;;
+        *)
+            # For other versions, use latest
+            echo "node"
+            ;;
+    esac
+}
+
 # Main execution
 main() {
     local min_version=""
@@ -82,30 +114,38 @@ main() {
     export HOMEBREW_CACHE="$FREVANA_HOME/Cache"
     export HOMEBREW_LOGS="$FREVANA_HOME/Logs"
     
-    # Install Node.js using Homebrew
+    # Determine Node.js formula based on version requirement
+    local node_formula=$(select_node_version "$min_version")
+    if [ -n "$min_version" ]; then
+        echo "🎯 Installing Node.js >= $min_version (using $node_formula)"
+    else
+        echo "🎯 Installing latest Node.js ($node_formula)"
+    fi
+    
+    # Install Node.js using Homebrew with fallback
     echo "📦 Installing Node.js..."
-    if "$brew_cmd" install node; then
+    if "$brew_cmd" install "$node_formula"; then
         echo "✅ Node.js installed successfully!"
     else
-        echo "❌ Error: Node.js installation failed" >&2
-        exit 1
+        echo "⚠️ Failed to install $node_formula, trying fallback version..."
+        # Fallback to latest node if the requested version fails
+        if [ "$node_formula" != "node" ]; then
+            node_formula="node"
+            echo "📦 Installing fallback Node.js ($node_formula)..."
+            if "$brew_cmd" install "$node_formula"; then
+                echo "✅ Fallback Node.js installed successfully!"
+            else
+                echo "❌ Error: Node.js installation failed even with fallback" >&2
+                exit 1
+            fi
+        else
+            echo "❌ Error: Node.js installation failed" >&2
+            exit 1
+        fi
     fi
     
-    # Create symbolic links in FREVANA_HOME/bin
-    echo "🔗 Creating symbolic links..."
-    local node_path="$FREVANA_HOME/bin/node"
-    local npm_path="$FREVANA_HOME/bin/npm"
-    local npx_path="$FREVANA_HOME/bin/npx"
-    
-    if [ -f "$node_path" ]; then
-        echo "   → Node.js: $node_path"
-    fi
-    if [ -f "$npm_path" ]; then
-        echo "   → npm: $npm_path"
-    fi
-    if [ -f "$npx_path" ]; then
-        echo "   → npx: $npx_path"
-    fi
+    # Create symbolic links for Node.js tools
+    create_node_links "$node_formula"
     
     # Verify installation
     echo ""
@@ -124,11 +164,41 @@ main() {
     
     echo ""
     echo "✅ Node.js installation completed successfully!"
-    echo "🎉 You can now use 'node' and 'npm' commands"
+    echo "🎉 You can now use 'node', 'npm', and 'npx' commands"
     echo ""
     echo "To get started:"
-    echo "  $node_path --version"
-    echo "  $npm_path --version"
+    echo "  node --version"
+    echo "  npm --version"
+    echo "  npx --version"
+}
+
+# Create symbolic links for Node.js
+create_node_links() {
+    local node_formula="$1"
+    echo "🔗 Creating symbolic links..."
+    
+    # Node.js binaries should be available in FREVANA_HOME/bin after Homebrew install
+    local node_path="$FREVANA_HOME/bin/node"
+    local npm_path="$FREVANA_HOME/bin/npm"
+    local npx_path="$FREVANA_HOME/bin/npx"
+    
+    if [ -f "$node_path" ]; then
+        echo "   → Node.js: $node_path"
+    else
+        echo "⚠️ Warning: Node.js binary not found at $node_path"
+    fi
+    
+    if [ -f "$npm_path" ]; then
+        echo "   → npm: $npm_path"
+    else
+        echo "⚠️ Warning: npm binary not found at $npm_path"
+    fi
+    
+    if [ -f "$npx_path" ]; then
+        echo "   → npx: $npx_path"
+    else
+        echo "⚠️ Warning: npx binary not found at $npx_path"
+    fi
 }
 
 # Run main function
