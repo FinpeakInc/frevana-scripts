@@ -232,27 +232,15 @@ check_component() {
             log "✓ Found $cmd in FREVANA_HOME: $FREVANA_HOME/bin/$cmd"
         fi
         
-        # Check system PATH
+        # Check system PATH (for informational purposes only)
         if command -v "$cmd" &> /dev/null; then
             found_in_system=true
             system_cmd_path=$(command -v "$cmd")
-            log "✓ Found $cmd in system PATH: $system_cmd_path"
+            log "✓ Found $cmd in system PATH: $system_cmd_path (not auto-linking)"
         fi
         
-        # Auto-link system version to FREVANA_HOME if not already there
-        if [ "$found_in_system" = true ] && [ "$found_in_frevana" = false ] && [ -n "$FREVANA_HOME" ]; then
-            log "🔗 Auto-linking system $cmd to FREVANA_HOME..."
-            mkdir -p "$FREVANA_HOME/bin"
-            if ln -sf "$system_cmd_path" "$FREVANA_HOME/bin/$cmd" 2>/dev/null; then
-                log "✅ Successfully linked $system_cmd_path → $FREVANA_HOME/bin/$cmd"
-                found_in_frevana=true
-            else
-                log "⚠️ Failed to create link, using system version"
-            fi
-        fi
-        
-        # Determine if command is available
-        if [ "$found_in_frevana" = true ] || [ "$found_in_system" = true ]; then
+        # Only use FREVANA_HOME version for checks
+        if [ "$found_in_frevana" = true ]; then
             current_version=$(get_version "$cmd")
             log "✓ Found $cmd version: $current_version"
             
@@ -301,9 +289,15 @@ check_component() {
                 fi
             fi
         else
-            status="missing"
-            current_version=""
-            message="$cmd not found"
+            if [ "$found_in_system" = true ]; then
+                status="missing"
+                current_version=""
+                message="$cmd not found in FREVANA_HOME (system version exists but not used)"
+            else
+                status="missing"
+                current_version=""
+                message="$cmd not found"
+            fi
             
             # Set specific install URLs for direct download
             case "$cmd" in
