@@ -113,6 +113,9 @@ select_node_version() {
 # Main execution
 main() {
     local min_version=""
+    local node_path=""
+    local npm_path=""
+    local npx_path=""
     
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
@@ -185,13 +188,13 @@ main() {
         fi
     fi
     
-    # Create symbolic links for Node.js tools
+    # Create symbolic links for Node.js tools  
     create_node_links "$node_formula"
     
     # Verify installation
     echo ""
     echo "✅ Verifying Node.js installation..."
-    if "$node_path" --version >/dev/null 2>&1; then
+    if [ -x "$node_path" ] && "$node_path" --version >/dev/null 2>&1; then
         local node_version=$("$node_path" --version)
         local npm_version=$("$npm_path" --version 2>/dev/null || echo "unknown")
         echo "   → Node.js version: $node_version"
@@ -218,28 +221,42 @@ create_node_links() {
     local node_formula="$1"
     echo "🔗 Creating symbolic links..."
     
-    # Node.js binaries should be available in FREVANA_HOME/bin after Homebrew install
-    local node_path="$FREVANA_HOME/bin/node"
-    local npm_path="$FREVANA_HOME/bin/npm"
-    local npx_path="$FREVANA_HOME/bin/npx"
+    # Determine the Cellar path for the Node.js installation
+    local cellar_path="$FREVANA_HOME/Cellar/$node_formula"
     
-    if [ -f "$node_path" ]; then
-        echo "   → Node.js: $node_path"
+    # Find the installed version directory
+    if [ -d "$cellar_path" ]; then
+        local version_dir=$(ls -1 "$cellar_path" | head -n1)
+        local node_bin_dir="$cellar_path/$version_dir/bin"
+        
+        if [ -d "$node_bin_dir" ]; then
+            # Create symbolic links for all Node.js binaries
+            for binary in node npm npx; do
+                local source_binary="$node_bin_dir/$binary"
+                local target_link="$FREVANA_HOME/bin/$binary"
+                
+                if [ -f "$source_binary" ]; then
+                    # Remove existing link if present
+                    [ -L "$target_link" ] && rm "$target_link"
+                    
+                    # Create new symbolic link
+                    ln -s "$source_binary" "$target_link"
+                    echo "   → $binary: $target_link"
+                else
+                    echo "⚠️ Warning: $binary binary not found at $source_binary"
+                fi
+            done
+        else
+            echo "⚠️ Warning: Node.js bin directory not found at $node_bin_dir"
+        fi
     else
-        echo "⚠️ Warning: Node.js binary not found at $node_path"
+        echo "⚠️ Warning: Node.js installation not found in Cellar at $cellar_path"
     fi
     
-    if [ -f "$npm_path" ]; then
-        echo "   → npm: $npm_path"
-    else
-        echo "⚠️ Warning: npm binary not found at $npm_path"
-    fi
-    
-    if [ -f "$npx_path" ]; then
-        echo "   → npx: $npx_path"
-    else
-        echo "⚠️ Warning: npx binary not found at $npx_path"
-    fi
+    # Set global variables for verification
+    node_path="$FREVANA_HOME/bin/node"
+    npm_path="$FREVANA_HOME/bin/npm"
+    npx_path="$FREVANA_HOME/bin/npx"
 }
 
 # Run main function
