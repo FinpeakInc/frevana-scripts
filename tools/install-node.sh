@@ -42,9 +42,13 @@ check_homebrew() {
     
     echo "🔍 Homebrew not found, installing automatically..." >&2
     
-    # Install Homebrew using the install script
+    # Install Homebrew using the install script with non-interactive mode
     BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
     export FREVANA_HOME="$FREVANA_HOME"
+    export NONINTERACTIVE=1
+    export HOMEBREW_NO_INSTALL_CLEANUP=1
+    export HOMEBREW_NO_AUTO_UPDATE=1
+    export HOMEBREW_NO_ENV_HINTS=1
     
     if command -v curl &> /dev/null; then
         if bash -c "$(curl -fsSL "$BASE_URL/tools/install-homebrew.sh")" >/dev/null 2>&1; then
@@ -140,12 +144,16 @@ main() {
         exit 1
     fi
     
-    # Set up isolated Homebrew environment
+    # Set up isolated Homebrew environment with non-interactive mode
     export HOMEBREW_PREFIX="$FREVANA_HOME"
     export HOMEBREW_CELLAR="$FREVANA_HOME/Cellar"
     export HOMEBREW_REPOSITORY="$FREVANA_HOME/homebrew"
     export HOMEBREW_CACHE="$FREVANA_HOME/Cache"
     export HOMEBREW_LOGS="$FREVANA_HOME/Logs"
+    export HOMEBREW_NO_AUTO_UPDATE=1
+    export HOMEBREW_NO_ENV_HINTS=1
+    export HOMEBREW_NO_INSTALL_CLEANUP=1
+    export NONINTERACTIVE=1
     
     # Determine Node.js formula based on version requirement
     local node_formula=$(select_node_version "$min_version")
