@@ -32,22 +32,27 @@ mkdir -p "$FREVANA_HOME/bin"
 echo "Installing UV to $FREVANA_HOME/bin..."
 
 # Download and install UV using the official installer
-curl -LsSf https://astral.sh/uv/install.sh | env CARGO_HOME="$FREVANA_HOME" RUSTUP_HOME="$FREVANA_HOME" sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Move uv binary to the expected location
-if [ -f "$FREVANA_HOME/bin/uv" ]; then
-    echo "✓ UV installed successfully to $FREVANA_HOME/bin/uv"
-    
-    # Test the installation
-    if "$FREVANA_HOME/bin/uv" --version > /dev/null 2>&1; then
-        echo "✓ UV installation verified"
-        "$FREVANA_HOME/bin/uv" --version
-    else
-        echo "✗ UV installation verification failed"
-        exit 1
+# Move uv binaries from default location to FREVANA_HOME/bin
+if [ -f "$HOME/.local/bin/uv" ]; then
+    echo "Moving UV from $HOME/.local/bin to $FREVANA_HOME/bin..."
+    mv "$HOME/.local/bin/uv" "$FREVANA_HOME/bin/uv"
+    if [ -f "$HOME/.local/bin/uvx" ]; then
+        mv "$HOME/.local/bin/uvx" "$FREVANA_HOME/bin/uvx"
     fi
+    echo "✓ UV moved successfully to $FREVANA_HOME/bin/"
 else
-    echo "✗ UV installation failed - binary not found at expected location"
+    echo "✗ UV installation failed - binary not found at $HOME/.local/bin/uv"
+    exit 1
+fi
+
+# Test the installation
+if "$FREVANA_HOME/bin/uv" --version > /dev/null 2>&1; then
+    echo "✓ UV installation verified"
+    "$FREVANA_HOME/bin/uv" --version
+else
+    echo "✗ UV installation verification failed"
     exit 1
 fi
 
