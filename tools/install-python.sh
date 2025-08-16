@@ -52,11 +52,10 @@ check_homebrew() {
     local brew_cmd="$FREVANA_HOME/bin/brew"
     
     if [ -x "$brew_cmd" ]; then
-        echo "$brew_cmd"
         return 0
     fi
     
-    echo "🔍 Homebrew not found, installing automatically..."
+    echo "🔍 Homebrew not found, installing automatically..." >&2
     
     # Install Homebrew using the install script
     BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
@@ -64,30 +63,29 @@ check_homebrew() {
     
     if command -v curl &> /dev/null; then
         if bash -c "$(curl -fsSL "$BASE_URL/tools/install-homebrew.sh")" >/dev/null 2>&1; then
-            echo "✅ Homebrew installed successfully!"
+            echo "✅ Homebrew installed successfully!" >&2
         else
             echo "❌ Error: Failed to install Homebrew" >&2
-            exit 1
+            return 1
         fi
     elif command -v wget &> /dev/null; then
         if bash -c "$(wget -qO- "$BASE_URL/tools/install-homebrew.sh")" >/dev/null 2>&1; then
-            echo "✅ Homebrew installed successfully!"
+            echo "✅ Homebrew installed successfully!" >&2
         else
             echo "❌ Error: Failed to install Homebrew" >&2
-            exit 1
+            return 1
         fi
     else
         echo "❌ Error: Neither curl nor wget found" >&2
-        exit 1
+        return 1
     fi
     
     # Verify Homebrew is now available
     if [ -x "$brew_cmd" ]; then
-        echo "$brew_cmd"
         return 0
     else
         echo "❌ Error: Homebrew installation failed" >&2
-        exit 1
+        return 1
     fi
 }
 
@@ -261,8 +259,13 @@ main() {
     echo ""
     
     # Check for Homebrew
-    local brew_cmd=$(check_homebrew)
-    echo "🍺 Using Homebrew: $brew_cmd"
+    if check_homebrew; then
+        local brew_cmd="$FREVANA_HOME/bin/brew"
+        echo "🍺 Using Homebrew: $brew_cmd"
+    else
+        echo "❌ Error: Could not install or find Homebrew" >&2
+        exit 1
+    fi
     echo ""
     
     # Install Python via Homebrew
