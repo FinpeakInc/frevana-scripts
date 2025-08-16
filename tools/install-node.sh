@@ -41,22 +41,21 @@ check_homebrew() {
         return 0
     fi
     
-    echo "🔍 Homebrew not found at $brew_cmd"
-    echo "📥 Installing Homebrew automatically..."
+    echo "🔍 Homebrew not found, installing automatically..."
     
     # Install Homebrew using the install script
     BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
     export FREVANA_HOME="$FREVANA_HOME"
     
     if command -v curl &> /dev/null; then
-        if bash -c "$(curl -fsSL "$BASE_URL/tools/install-homebrew.sh")"; then
+        if bash -c "$(curl -fsSL "$BASE_URL/tools/install-homebrew.sh")" >/dev/null 2>&1; then
             echo "✅ Homebrew installed successfully!"
         else
             echo "❌ Error: Failed to install Homebrew" >&2
             exit 1
         fi
     elif command -v wget &> /dev/null; then
-        if bash -c "$(wget -qO- "$BASE_URL/tools/install-homebrew.sh")"; then
+        if bash -c "$(wget -qO- "$BASE_URL/tools/install-homebrew.sh")" >/dev/null 2>&1; then
             echo "✅ Homebrew installed successfully!"
         else
             echo "❌ Error: Failed to install Homebrew" >&2
