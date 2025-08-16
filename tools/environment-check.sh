@@ -274,8 +274,16 @@ check_component() {
                         "brew")
                             install_url="$URL_HOMEBREW"  # fallback for homebrew
                             ;;
+                        # Common Python tools - install via pip
+                        "uvx"|"uv"|"poetry"|"black"|"pytest"|"mypy"|"flake8"|"bandit")
+                            install_url="$URL_PYTHON"  # Install Python first, then use pip
+                            ;;
+                        # Common Node tools - install via npm  
+                        "eslint"|"prettier"|"typescript"|"ts-node"|"webpack"|"vite")
+                            install_url="$URL_NODE"  # Install Node.js first, then use npm
+                            ;;
                         *)
-                            install_url="$BASE_URL/install-$cmd.sh"
+                            install_url=""  # Unknown tool, no install URL
                             ;;
                     esac
                     
@@ -296,7 +304,18 @@ check_component() {
             else
                 status="missing"
                 current_version=""
-                message="$cmd not found"
+                # Provide helpful installation guidance
+                case "$cmd" in
+                    "uvx"|"uv"|"poetry"|"black"|"pytest"|"mypy"|"flake8"|"bandit")
+                        message="$cmd not found - install Python first, then: pip install $cmd"
+                        ;;
+                    "eslint"|"prettier"|"typescript"|"ts-node"|"webpack"|"vite")
+                        message="$cmd not found - install Node.js first, then: npm install -g $cmd"
+                        ;;
+                    *)
+                        message="$cmd not found"
+                        ;;
+                esac
             fi
             
             # Set specific install URLs for direct download
@@ -319,8 +338,16 @@ check_component() {
                 "brew")
                     install_url="$URL_HOMEBREW"  # fallback for homebrew
                     ;;
+                # Common Python tools - install via pip
+                "uvx"|"uv"|"poetry"|"black"|"pytest"|"mypy"|"flake8"|"bandit")
+                    install_url="$URL_PYTHON"  # Install Python first, then use pip
+                    ;;
+                # Common Node tools - install via npm
+                "eslint"|"prettier"|"typescript"|"ts-node"|"webpack"|"vite")
+                    install_url="$URL_NODE"  # Install Node.js first, then use npm
+                    ;;
                 *)
-                    install_url="$BASE_URL/install-$cmd.sh"
+                    install_url=""  # Unknown tool, no install URL
                     ;;
             esac
             
