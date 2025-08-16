@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Homebrew Installer for macOS x64
-# Auto-detects system Homebrew and links it, or installs to FREVANA_HOME
+# Creates completely isolated Homebrew installation
 
 set -e
 
@@ -10,6 +10,23 @@ if [ -z "$FREVANA_HOME" ]; then
     echo "❌ Error: FREVANA_HOME not set" >&2
     exit 1
 fi
+
+# ================================
+# HOMEBREW ENVIRONMENT SETUP
+# ================================
+# Set Homebrew environment variables to point to FREVANA_HOME
+# This creates a completely isolated Homebrew installation
+echo "🔧 Setting up isolated Homebrew environment..."
+
+export HOMEBREW_PREFIX="$FREVANA_HOME"
+export HOMEBREW_CELLAR="$FREVANA_HOME/Cellar"
+export HOMEBREW_REPOSITORY="$FREVANA_HOME/homebrew"
+export HOMEBREW_CACHE="$FREVANA_HOME/Cache"
+export HOMEBREW_LOGS="$FREVANA_HOME/Logs"
+
+echo "   → HOMEBREW_PREFIX: $HOMEBREW_PREFIX"
+echo "   → HOMEBREW_REPOSITORY: $HOMEBREW_REPOSITORY"
+echo "   → HOMEBREW_CELLAR: $HOMEBREW_CELLAR"
 
 echo "🍺 Setting up Homebrew for macOS x64..."
 echo ""
@@ -22,6 +39,8 @@ brew_locations=(
     "/home/linuxbrew/.linuxbrew"  # Linux (just in case)
 )
 
+# Note: We always install independent Homebrew to avoid path issues
+
 # Check if system already has Homebrew
 system_brew_path=""
 for location in "${brew_locations[@]}"; do
@@ -32,69 +51,48 @@ for location in "${brew_locations[@]}"; do
     fi
 done
 
-frevana_brew_path="$FREVANA_HOME/homebrew"
-
 if [ -n "$system_brew_path" ]; then
-    echo "🔗 Linking existing Homebrew to FREVANA_HOME..."
-    
-    # Create symbolic link to the entire Homebrew installation
-    if [ -L "$frevana_brew_path" ] || [ -d "$frevana_brew_path" ]; then
-        echo "   → Removing existing $frevana_brew_path"
-        rm -rf "$frevana_brew_path"
-    fi
-    
-    ln -sf "$system_brew_path" "$frevana_brew_path"
-    echo "   → Linked $system_brew_path → $frevana_brew_path"
-    
-    # Also create direct links in FREVANA_HOME/bin for convenience
-    mkdir -p "$FREVANA_HOME/bin"
-    ln -sf "$frevana_brew_path/bin/brew" "$FREVANA_HOME/bin/brew"
-    
-    # Verify the link works
-    if "$frevana_brew_path/bin/brew" --version >/dev/null 2>&1; then
-        brew_version=$("$frevana_brew_path/bin/brew" --version | head -n1)
-        echo "✅ Successfully linked Homebrew: $brew_version"
-    else
-        echo "❌ Error: Linked Homebrew is not working" >&2
-        exit 1
-    fi
-    
+    echo "ℹ️ Found existing Homebrew at: $system_brew_path"
+    echo "⚠️ Installing independent Homebrew to FREVANA_HOME to avoid conflicts..."
+    echo ""
+fi
+
+# Install Homebrew to the repository location
+echo "📥 Installing Homebrew to isolated environment..."
+
+# Remove existing installation if it exists
+if [ -d "$HOMEBREW_REPOSITORY" ]; then
+    echo "   → Removing existing Homebrew installation"
+    rm -rf "$HOMEBREW_REPOSITORY"
+fi
+
+echo "   → Cloning Homebrew repository to: $HOMEBREW_REPOSITORY"
+git clone https://github.com/Homebrew/brew.git "$HOMEBREW_REPOSITORY"
+
+# Create bin directory and link
+mkdir -p "$HOMEBREW_PREFIX/bin"
+ln -sf "$HOMEBREW_REPOSITORY/bin/brew" "$HOMEBREW_PREFIX/bin/brew"
+
+# Verify installation
+if "$HOMEBREW_PREFIX/bin/brew" --version >/dev/null 2>&1; then
+    brew_version=$("$HOMEBREW_PREFIX/bin/brew" --version | head -n1)
+    echo "✅ Successfully installed Homebrew: $brew_version"
 else
-    echo "📥 No existing Homebrew found, installing to FREVANA_HOME..."
-    
-    # Clone Homebrew directly to FREVANA_HOME
-    if [ -d "$frevana_brew_path" ]; then
-        echo "   → Removing existing $frevana_brew_path"
-        rm -rf "$frevana_brew_path"
-    fi
-    
-    echo "   → Cloning Homebrew repository..."
-    git clone https://github.com/Homebrew/brew.git "$frevana_brew_path"
-    
-    # Create direct link in FREVANA_HOME/bin
-    mkdir -p "$FREVANA_HOME/bin"
-    ln -sf "$frevana_brew_path/bin/brew" "$FREVANA_HOME/bin/brew"
-    
-    # Verify installation
-    if "$frevana_brew_path/bin/brew" --version >/dev/null 2>&1; then
-        brew_version=$("$frevana_brew_path/bin/brew" --version | head -n1)
-        echo "✅ Successfully installed Homebrew: $brew_version"
-    else
-        echo "❌ Error: Homebrew installation failed" >&2
-        exit 1
-    fi
+    echo "❌ Error: Homebrew installation failed" >&2
+    exit 1
 fi
 
 echo ""
-echo "🔧 Setting up Homebrew environment..."
-echo "   → Homebrew location: $frevana_brew_path"
-echo "   → Homebrew command: $FREVANA_HOME/bin/brew"
+echo "🔧 Homebrew environment configured:"
+echo "   → Installation: $HOMEBREW_REPOSITORY"
+echo "   → Command: $HOMEBREW_PREFIX/bin/brew"
+echo "   → Cellar: $HOMEBREW_CELLAR"
 
 # Test basic functionality
 echo ""
 echo "🧪 Testing Homebrew functionality..."
-if "$FREVANA_HOME/bin/brew" --version >/dev/null 2>&1; then
-    version_info=$("$FREVANA_HOME/bin/brew" --version | head -n1)
+if "$HOMEBREW_PREFIX/bin/brew" --version >/dev/null 2>&1; then
+    version_info=$("$HOMEBREW_PREFIX/bin/brew" --version | head -n1)
     echo "   → $version_info"
     echo "   → Homebrew is ready to use!"
 else
@@ -107,5 +105,5 @@ echo "✅ Homebrew setup completed successfully!"
 echo "🎉 You can now use Homebrew to install packages"
 echo ""
 echo "To get started:"
-echo "  $FREVANA_HOME/bin/brew --version"
-echo "  $FREVANA_HOME/bin/brew install python@3.12"
+echo "  $HOMEBREW_PREFIX/bin/brew --version"
+echo "  $HOMEBREW_PREFIX/bin/brew install python@3.12"

@@ -12,37 +12,21 @@ if [ -z "$FREVANA_HOME" ]; then
 fi
 
 # ================================
-# TEMPORARY SYMLINK HANDLING
+# HOMEBREW ENVIRONMENT SETUP
 # ================================
-# Create temporary symlink to handle spaces in path for Homebrew
-TEMP_LINK=""
-ORIGINAL_FREVANA_HOME="$FREVANA_HOME"
+# Set Homebrew environment variables to point to FREVANA_HOME
+# This creates a completely isolated Homebrew installation
+echo "🔧 Setting up isolated Homebrew environment..."
 
-# Check if FREVANA_HOME contains spaces
-if [[ "$FREVANA_HOME" == *" "* ]]; then
-    echo "⚠️ Path contains spaces, creating temporary symlink for Homebrew compatibility..."
-    
-    # Create temporary symlink pointing to Application Support
-    TEMP_LINK="$HOME/Library/ApplicationSupport-temp-$$"
-    ln -sf "$HOME/Library/Application Support" "$TEMP_LINK"
-    
-    # Update FREVANA_HOME to use the symlink path
-    FREVANA_HOME=$(echo "$FREVANA_HOME" | sed "s|$HOME/Library/Application Support|$TEMP_LINK|")
-    
-    echo "   → Original path: $ORIGINAL_FREVANA_HOME"
-    echo "   → Temporary path: $FREVANA_HOME"
-fi
+export HOMEBREW_PREFIX="$FREVANA_HOME"
+export HOMEBREW_CELLAR="$FREVANA_HOME/Cellar"
+export HOMEBREW_REPOSITORY="$FREVANA_HOME/homebrew"
+export HOMEBREW_CACHE="$FREVANA_HOME/Cache"
+export HOMEBREW_LOGS="$FREVANA_HOME/Logs"
 
-# Cleanup function
-cleanup() {
-    if [ -n "$TEMP_LINK" ] && [ -L "$TEMP_LINK" ]; then
-        rm "$TEMP_LINK"
-        echo "🧹 Cleaned up temporary symlink: $TEMP_LINK"
-    fi
-}
-
-# Set up cleanup on script exit
-trap cleanup EXIT
+echo "   → HOMEBREW_PREFIX: $HOMEBREW_PREFIX"
+echo "   → HOMEBREW_REPOSITORY: $HOMEBREW_REPOSITORY"
+echo "   → HOMEBREW_CELLAR: $HOMEBREW_CELLAR"
 
 echo "🍺 Setting up Homebrew for macOS ARM64..."
 echo ""
@@ -75,34 +59,25 @@ if [ -n "$system_brew_path" ]; then
     echo ""
 fi
 
-# Always install independent Homebrew to FREVANA_HOME for full isolation
-echo "📥 Installing independent Homebrew to FREVANA_HOME..."
+# Install Homebrew to the repository location
+echo "📥 Installing Homebrew to isolated environment..."
 
-# Clone Homebrew directly to FREVANA_HOME
-if [ -d "$frevana_brew_path" ]; then
-    echo "   → Removing existing $frevana_brew_path"
-    rm -rf "$frevana_brew_path"
+# Remove existing installation if it exists
+if [ -d "$HOMEBREW_REPOSITORY" ]; then
+    echo "   → Removing existing Homebrew installation"
+    rm -rf "$HOMEBREW_REPOSITORY"
 fi
 
-echo "   → Cloning Homebrew repository..."
-git clone https://github.com/Homebrew/brew.git "$frevana_brew_path"
+echo "   → Cloning Homebrew repository to: $HOMEBREW_REPOSITORY"
+git clone https://github.com/Homebrew/brew.git "$HOMEBREW_REPOSITORY"
 
-# Create direct link in FREVANA_HOME/bin
-mkdir -p "$FREVANA_HOME/bin"
-ln -sf "$frevana_brew_path/bin/brew" "$FREVANA_HOME/bin/brew"
-
-# If we used a temporary link, create correct links using original path
-if [ -n "$TEMP_LINK" ]; then
-    echo "🔗 Creating final links using original path..."
-    original_brew_path="${frevana_brew_path/$TEMP_LINK/$HOME/Library/Application Support}"
-    mkdir -p "$(dirname "$ORIGINAL_FREVANA_HOME/bin/brew")"
-    ln -sf "$original_brew_path/bin/brew" "$ORIGINAL_FREVANA_HOME/bin/brew"
-    echo "   → Final brew link: $ORIGINAL_FREVANA_HOME/bin/brew"
-fi
+# Create bin directory and link
+mkdir -p "$HOMEBREW_PREFIX/bin"
+ln -sf "$HOMEBREW_REPOSITORY/bin/brew" "$HOMEBREW_PREFIX/bin/brew"
 
 # Verify installation
-if "$frevana_brew_path/bin/brew" --version >/dev/null 2>&1; then
-    brew_version=$("$frevana_brew_path/bin/brew" --version | head -n1)
+if "$HOMEBREW_PREFIX/bin/brew" --version >/dev/null 2>&1; then
+    brew_version=$("$HOMEBREW_PREFIX/bin/brew" --version | head -n1)
     echo "✅ Successfully installed Homebrew: $brew_version"
 else
     echo "❌ Error: Homebrew installation failed" >&2
@@ -110,15 +85,16 @@ else
 fi
 
 echo ""
-echo "🔧 Setting up Homebrew environment..."
-echo "   → Homebrew location: $frevana_brew_path"
-echo "   → Homebrew command: $FREVANA_HOME/bin/brew"
+echo "🔧 Homebrew environment configured:"
+echo "   → Installation: $HOMEBREW_REPOSITORY"
+echo "   → Command: $HOMEBREW_PREFIX/bin/brew"
+echo "   → Cellar: $HOMEBREW_CELLAR"
 
 # Test basic functionality
 echo ""
 echo "🧪 Testing Homebrew functionality..."
-if "$FREVANA_HOME/bin/brew" --version >/dev/null 2>&1; then
-    version_info=$("$FREVANA_HOME/bin/brew" --version | head -n1)
+if "$HOMEBREW_PREFIX/bin/brew" --version >/dev/null 2>&1; then
+    version_info=$("$HOMEBREW_PREFIX/bin/brew" --version | head -n1)
     echo "   → $version_info"
     echo "   → Homebrew is ready to use!"
 else
@@ -131,5 +107,5 @@ echo "✅ Homebrew setup completed successfully!"
 echo "🎉 You can now use Homebrew to install packages"
 echo ""
 echo "To get started:"
-echo "  $FREVANA_HOME/bin/brew --version"
-echo "  $FREVANA_HOME/bin/brew install python@3.12"
+echo "  $HOMEBREW_PREFIX/bin/brew --version"
+echo "  $HOMEBREW_PREFIX/bin/brew install python@3.12"
