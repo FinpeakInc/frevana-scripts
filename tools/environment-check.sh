@@ -12,6 +12,7 @@ BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/head
 URL_NODE="$BASE_URL/tools/install-node.sh"
 URL_PYTHON="$BASE_URL/tools/install-python.sh"
 URL_HOMEBREW="$BASE_URL/tools/install-homebrew.sh"
+URL_UV="$BASE_URL/tools/install-uv.sh"
 
 # ================================
 # FREVANA ENVIRONMENT SETUP
@@ -37,7 +38,6 @@ fi
 # Default values
 COMMAND=""
 MIN_VERSION=""
-PACKAGE_MANAGER=""
 VERBOSE=false
 
 # Parse command line arguments
@@ -51,17 +51,13 @@ while [[ $# -gt 0 ]]; do
             MIN_VERSION="${1#*=}"
             shift
             ;;
-        --package-manager=*)
-            PACKAGE_MANAGER="${1#*=}"
-            shift
-            ;;
         --verbose)
             VERBOSE=true
             shift
             ;;
         *)
             echo "Unknown option: $1" >&2
-            echo "Usage: $0 --command=COMMAND [--min-version=VERSION] [--package-manager=pip|npm|direct] [--verbose]" >&2
+            echo "Usage: $0 --command=COMMAND [--min-version=VERSION] [--verbose]" >&2
             exit 1
             ;;
     esac
@@ -113,6 +109,9 @@ get_version() {
         "brew")
             "$cmd_path" --version 2>/dev/null | head -n1 | sed 's/Homebrew //' || echo ""
             ;;
+        "uv")
+            "$cmd_path" --version 2>/dev/null | cut -d' ' -f2 || echo ""
+            ;;
         "git")
             "$cmd_path" --version 2>/dev/null | cut -d' ' -f3 || echo ""
             ;;
@@ -125,99 +124,6 @@ get_version() {
     esac
 }
 
-# Get dependency chain for a command
-get_dependencies() {
-    local cmd="$1"
-    local deps=()
-    
-    log "Building dependency chain for: $cmd"
-    
-    # Handle built-in dependencies first
-    case "$cmd" in
-        "npm")
-            # npm requires node
-            if ! command -v node &> /dev/null; then
-                log "npm requires Node.js"
-                deps+=("node")
-            fi
-            ;;
-        "pip"|"pip3")
-            # pip requires python
-            if ! command -v python3 &> /dev/null; then
-                log "pip requires Python3"
-                deps+=("python3")
-            fi
-            ;;
-        "git")
-            # git comes with Xcode Command Line Tools, but we assume basic tools exist
-            # No dependencies needed since these are system-level tools
-            log "git is a system tool, no dependencies needed"
-            ;;
-        # Common Python tools that require Python and pip
-        "uvx"|"uv"|"poetry"|"black"|"pytest"|"mypy"|"flake8"|"bandit")
-            log "$cmd is a Python tool, checking Python dependencies"
-            if [ ! -x "$FREVANA_HOME/bin/python3" ]; then
-                log "Adding python3 to dependency chain"
-                deps+=("python3")
-            fi
-            if [ ! -x "$FREVANA_HOME/bin/pip3" ]; then
-                log "Adding pip3 to dependency chain"
-                deps+=("pip3")
-            fi
-            ;;
-        # Common Node.js tools that require Node.js and npm
-        "eslint"|"prettier"|"typescript"|"ts-node"|"webpack"|"vite")
-            log "$cmd is a Node.js tool, checking Node.js dependencies"
-            if [ ! -x "$FREVANA_HOME/bin/node" ]; then
-                log "Adding node to dependency chain"
-                deps+=("node")
-            fi
-            if [ ! -x "$FREVANA_HOME/bin/npm" ]; then
-                log "Adding npm to dependency chain"
-                deps+=("npm")
-            fi
-            ;;
-        *)
-            # Only check package manager dependencies if explicitly specified
-            if [ -n "$PACKAGE_MANAGER" ]; then
-                case "$PACKAGE_MANAGER" in
-                    "pip")
-                        log "$cmd specified as pip package, checking dependencies"
-                        if ! command -v pip3 &> /dev/null; then
-                            if ! command -v python3 &> /dev/null; then
-                                log "Adding python3 to dependency chain"
-                                deps+=("python3")
-                            fi
-                            log "Adding pip3 to dependency chain"
-                            deps+=("pip3")
-                        fi
-                        ;;
-                    "npm")
-                        log "$cmd specified as npm package, checking dependencies"
-                        if ! command -v npm &> /dev/null; then
-                            if ! command -v node &> /dev/null; then
-                                log "Adding node to dependency chain"
-                                deps+=("node")
-                            fi
-                            log "Adding npm to dependency chain"
-                            deps+=("npm")
-                        fi
-                        ;;
-                    "direct")
-                        log "$cmd can be installed directly"
-                        ;;
-                    *)
-                        log "Unknown package manager: $PACKAGE_MANAGER"
-                        ;;
-                esac
-            else
-                log "$cmd package manager not specified, checking as standalone tool"
-            fi
-            ;;
-    esac
-    
-    printf '%s\n' "${deps[@]}"
-}
 
 # Check a single component
 check_component() {
@@ -298,13 +204,9 @@ check_component() {
                         "brew")
                             install_url="$URL_HOMEBREW"  # fallback for homebrew
                             ;;
-                        # Common Python tools - install via pip
-                        "uvx"|"uv"|"poetry"|"black"|"pytest"|"mypy"|"flake8"|"bandit")
-                            install_url="$URL_PYTHON"  # Install Python first, then use pip
-                            ;;
-                        # Common Node tools - install via npm  
-                        "eslint"|"prettier"|"typescript"|"ts-node"|"webpack"|"vite")
-                            install_url="$URL_NODE"  # Install Node.js first, then use npm
+                        # UV tool - direct install
+                        "uv")
+                            install_url="$URL_UV"
                             ;;
                         *)
                             install_url=""  # Unknown tool, no install URL
@@ -330,11 +232,8 @@ check_component() {
                 current_version=""
                 # Provide helpful installation guidance
                 case "$cmd" in
-                    "uvx"|"uv"|"poetry"|"black"|"pytest"|"mypy"|"flake8"|"bandit")
-                        message="$cmd not found - install Python first, then: pip install $cmd"
-                        ;;
-                    "eslint"|"prettier"|"typescript"|"ts-node"|"webpack"|"vite")
-                        message="$cmd not found - install Node.js first, then: npm install -g $cmd"
+                    "uv")
+                        message="$cmd not found - install using: curl -LsSf https://astral.sh/uv/install.sh | sh"
                         ;;
                     *)
                         message="$cmd not found"
@@ -362,13 +261,8 @@ check_component() {
                 "brew")
                     install_url="$URL_HOMEBREW"  # fallback for homebrew
                     ;;
-                # Common Python tools - install via pip
-                "uvx"|"uv"|"poetry"|"black"|"pytest"|"mypy"|"flake8"|"bandit")
-                    install_url="$URL_PYTHON"  # Install Python first, then use pip
-                    ;;
-                # Common Node tools - install via npm
-                "eslint"|"prettier"|"typescript"|"ts-node"|"webpack"|"vite")
-                    install_url="$URL_NODE"  # Install Node.js first, then use npm
+                "uv")
+                    install_url="$URL_UV"
                     ;;
                 *)
                     install_url=""  # Unknown tool, no install URL
@@ -412,57 +306,16 @@ main() {
         log "Minimum version required: $MIN_VERSION"
     fi
     
-    local all_ready=true
-    
-    # Get dependency chain
-    local dependencies=($(get_dependencies "$COMMAND"))
-    
-    # Add the main command to the end of the dependency chain
-    dependencies+=("$COMMAND")
-    
-    log "Dependency chain: ${dependencies[*]}"
-    
-    # Check each component in the dependency chain
-    local result_json="["
-    local first=true
-    
-    for dep in "${dependencies[@]}"; do
-        if [ "$first" = true ]; then
-            first=false
-        else
-            result_json+=","
-        fi
-        
-        # Determine version requirement
-        local version_req=""
-        if [ "$dep" = "$COMMAND" ]; then
-            version_req="$MIN_VERSION"
-        fi
-        
-        # Check component and get JSON
-        local component_json=$(check_component "$dep" "$version_req")
-        result_json+="$component_json"
-        
-        # Check if this component is ready
-        if echo "$component_json" | grep -q '"status": "missing"' || echo "$component_json" | grep -q '"status": "outdated"'; then
-            all_ready=false
-        fi
-    done
-    
-    result_json+="]"
+    # Check only the requested command
+    local component_json=$(check_component "$COMMAND" "$MIN_VERSION")
     
     log "Environment check completed"
-    if [ "$all_ready" = true ]; then
-        log "✓ All dependencies satisfied"
-    else
-        log "! Some dependencies need attention"
-    fi
     
-    # Output the result
-    echo "$result_json"
+    # Output the result (single JSON object)
+    echo "$component_json"
     
-    # Exit with appropriate code
-    if [ "$all_ready" = true ]; then
+    # Exit with appropriate code based on status
+    if echo "$component_json" | grep -q '"status": "ready"'; then
         exit 0
     else
         exit 1
