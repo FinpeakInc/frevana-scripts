@@ -226,14 +226,14 @@ check_component() {
             if [ "$found_in_system" = true ]; then
                 status="missing"
                 current_version=""
-                message="$cmd not found in FREVANA_HOME (system version exists but not used)"
+                message="$cmd not found in FREVANA_HOME"
             else
                 status="missing"
                 current_version=""
                 # Provide helpful installation guidance
                 case "$cmd" in
                     "uv")
-                        message="$cmd not found - install using: curl -LsSf https://astral.sh/uv/install.sh | sh"
+                        message="$cmd not found"
                         ;;
                     *)
                         message="$cmd not found"
