@@ -7,6 +7,33 @@ set -e
 
 BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
 
+# ================================
+# FREVANA ENVIRONMENT SETUP
+# ================================
+get_default_frevana_home() {
+    case "$OSTYPE" in
+        "darwin"*)
+            echo "$HOME/.frevana/mcp-tools"
+            ;;
+        "msys" | "cygwin" | "win32")
+            echo "$HOME/.frevana/mcp-tools"
+            ;;
+        *)
+            echo "$HOME/.frevana/mcp-tools"
+            ;;
+    esac
+}
+
+if [ -z "$FREVANA_HOME" ]; then
+    FREVANA_HOME=$(get_default_frevana_home)
+    echo "📂 FREVANA_HOME not set, using default: $FREVANA_HOME"
+else
+    echo "📂 Using provided FREVANA_HOME: $FREVANA_HOME"
+fi
+
+# Ensure directory structure exists
+mkdir -p "$FREVANA_HOME"/bin
+
 # Detect OS and architecture
 detect_platform() {
     local os_type=""
@@ -18,7 +45,8 @@ detect_platform() {
             os_type="macos"
             ;;
         "linux-gnu"*)
-            os_type="linux"
+            echo "Error: Linux is not currently supported" >&2
+            exit 1
             ;;
         "msys" | "cygwin" | "win32")
             echo "Error: Homebrew is not supported on Windows" >&2
@@ -54,12 +82,17 @@ detect_platform() {
 # Main execution
 main() {
     echo "🍺 Installing Homebrew..."
+    echo ""
     
     local platform=$(detect_platform)
     local installer_url="$BASE_URL/installers/$platform/install-homebrew.sh"
     
     echo "📱 Detected platform: $platform"
     echo "🔗 Using installer: $installer_url"
+    echo ""
+    
+    # Set environment variables for the platform-specific installer
+    export FREVANA_HOME="$FREVANA_HOME"
     
     # Download and execute platform-specific installer
     if command -v curl &> /dev/null; then
@@ -73,6 +106,7 @@ main() {
         exit 1
     fi
     
+    echo ""
     echo "✅ Homebrew installation completed!"
 }
 

@@ -1,26 +1,23 @@
 #!/bin/bash
 
-# Universal Python Installer
-# Handles environment setup, installation, and linking
+# Universal Python Installer via Homebrew
+# Simplified installer using Homebrew for package management
 
 set -e
-
-BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
 
 # ================================
 # FREVANA ENVIRONMENT SETUP
 # ================================
 get_default_frevana_home() {
-    local app_name="Frevana"
     case "$OSTYPE" in
         "darwin"*)
-            echo "$HOME/Library/Application Support/$app_name/tools"
+            echo "$HOME/.frevana/mcp-tools"
             ;;
         "msys" | "cygwin" | "win32")
-            echo "$HOME/AppData/Roaming/$app_name/tools"
+            echo "$HOME/.frevana/mcp-tools"
             ;;
         *)
-            echo "$HOME/.config/$app_name/tools"
+            echo "$HOME/.frevana/mcp-tools"
             ;;
     esac
 }
@@ -33,7 +30,7 @@ else
 fi
 
 # Ensure directory structure exists
-mkdir -p "$FREVANA_HOME"/{bin,python,tmp}
+mkdir -p "$FREVANA_HOME"/bin
 
 # Parse command line arguments
 min_version=""
@@ -50,135 +47,77 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Detect OS and architecture
-detect_platform() {
-    local os_type=""
-    local arch=""
+# Check if Homebrew is available
+check_homebrew() {
+    local brew_cmd="$FREVANA_HOME/bin/brew"
     
-    # Detect OS
-    case "$OSTYPE" in
-        "darwin"*)
-            os_type="macos"
-            ;;
-        "linux-gnu"*)
-            os_type="linux"
-            ;;
-        "msys" | "cygwin" | "win32")
-            os_type="windows"
-            ;;
-        *)
-            echo "Error: Unsupported OS type: $OSTYPE" >&2
-            exit 1
-            ;;
-    esac
+    if [ -x "$brew_cmd" ]; then
+        echo "$brew_cmd"
+        return 0
+    fi
     
-    # Detect architecture
-    arch=$(uname -m 2>/dev/null || echo "unknown")
-    case "$arch" in
-        "x86_64" | "amd64")
-            arch="x64"
-            ;;
-        "arm64" | "aarch64")
-            arch="arm64"
-            ;;
-        "i386" | "i686")
-            arch="x32"
-            ;;
-        *)
-            echo "Error: Unsupported architecture: $arch" >&2
-            exit 1
-            ;;
-    esac
-    
-    echo "${os_type}/${arch}"
+    echo "❌ Error: Homebrew not found at $brew_cmd" >&2
+    echo "Please install Homebrew first using: bash tools/install-homebrew.sh" >&2
+    exit 1
 }
 
-# Download platform-specific Python package
-download_python() {
-    local platform="$1"
-    local download_script_url="$BASE_URL/installers/$platform/install-python.sh"
+# Install Python via Homebrew
+install_python_homebrew() {
+    local brew_cmd="$1"
+    local min_version="$2"
     
-    echo "📥 Downloading Python package via platform-specific script..."
-    echo "🔗 Download script: $download_script_url"
+    # Set up isolated Homebrew environment
+    export HOMEBREW_PREFIX="$FREVANA_HOME"
+    export HOMEBREW_CELLAR="$FREVANA_HOME/Cellar"
+    export HOMEBREW_REPOSITORY="$FREVANA_HOME/homebrew"
+    export HOMEBREW_CACHE="$FREVANA_HOME/Cache"
+    export HOMEBREW_LOGS="$FREVANA_HOME/Logs"
     
-    # Create a temporary script to handle the download
-    local temp_script="$FREVANA_HOME/tmp/download-python.sh"
-    
-    if command -v curl &> /dev/null; then
-        curl -fsSL "$download_script_url" > "$temp_script"
-    elif command -v wget &> /dev/null; then
-        wget -qO "$temp_script" "$download_script_url"
+    # Determine Python formula
+    local python_formula="python@3.12"
+    if [ -n "$min_version" ]; then
+        echo "🎯 Installing Python >= $min_version (using $python_formula)"
     else
-        echo "❌ Error: Neither curl nor wget found" >&2
+        echo "🎯 Installing latest Python ($python_formula)"
+    fi
+    
+    # Install Python using Homebrew
+    echo "📦 Installing Python..."
+    if "$brew_cmd" install "$python_formula"; then
+        echo "✅ Python installed successfully!"
+    else
+        echo "❌ Error: Python installation failed" >&2
         exit 1
     fi
     
-    chmod +x "$temp_script"
-    
-    # Execute the download script, passing our arguments and FREVANA_HOME
-    export FREVANA_HOME
-    if [ -n "$min_version" ]; then
-        "$temp_script" --min-version="$min_version"
-    else
-        "$temp_script"
-    fi
-    
-    # Clean up
-    rm -f "$temp_script"
+    return 0
 }
 
-# Extract and install Python
-install_python() {
-    local platform="$1"
-    local target_version="$2"
+# Create symbolic links for Python
+create_python_links() {
+    echo "🔗 Creating symbolic links..."
     
-    echo "📦 Installing Python v$target_version..."
+    # Find Python binaries in Homebrew installation
+    local python_bin="$FREVANA_HOME/bin/python3.12"
+    local pip_bin="$FREVANA_HOME/bin/pip3.12"
     
-    case "$platform" in
-        "macos/"* | "linux/"*)
-            # Extract tar.gz or zip archive
-            local archive_pattern="$FREVANA_HOME/tmp/python-$target_version-*"
-            local archive_file=$(ls $archive_pattern 2>/dev/null | head -n1)
-            
-            if [ -f "$archive_file" ]; then
-                echo "📦 Extracting Python archive..."
-                local install_dir="$FREVANA_HOME/python/v$target_version"
-                mkdir -p "$install_dir"
-                
-                if [[ "$archive_file" == *.tar.gz ]]; then
-                    tar -xzf "$archive_file" -C "$install_dir" --strip-components=1
-                elif [[ "$archive_file" == *.tar.xz ]]; then
-                    tar -xJf "$archive_file" -C "$install_dir" --strip-components=1
-                elif [[ "$archive_file" == *.zip ]]; then
-                    unzip -q "$archive_file" -d "$install_dir"
-                    # Move contents up one level if needed
-                    if [ -d "$install_dir/Python-$target_version" ]; then
-                        mv "$install_dir/Python-$target_version"/* "$install_dir/"
-                        rmdir "$install_dir/Python-$target_version"
-                    fi
-                fi
-                
-                echo "🔗 Creating symbolic links..."
-                case "$platform" in
-                    "windows/"*)
-                        ln -sf "$install_dir/python.exe" "$FREVANA_HOME/bin/python.exe"
-                        ln -sf "$install_dir/python.exe" "$FREVANA_HOME/bin/python3.exe"
-                        ln -sf "$install_dir/Scripts/pip.exe" "$FREVANA_HOME/bin/pip.exe"
-                        ln -sf "$install_dir/Scripts/pip.exe" "$FREVANA_HOME/bin/pip3.exe"
-                        ;;
-                    *)
-                        ln -sf "$install_dir/bin/python3" "$FREVANA_HOME/bin/python3"
-                        ln -sf "$install_dir/bin/python3" "$FREVANA_HOME/bin/python"
-                        ln -sf "$install_dir/bin/pip3" "$FREVANA_HOME/bin/pip3"
-                        ln -sf "$install_dir/bin/pip3" "$FREVANA_HOME/bin/pip"
-                        ;;
-                esac
-            else
-                echo "❌ Error: Archive file not found matching: $archive_pattern" >&2
-                exit 1
-            fi
-            ;;
-    esac
+    if [ -f "$python_bin" ]; then
+        ln -sf "$python_bin" "$FREVANA_HOME/bin/python3"
+        ln -sf "$python_bin" "$FREVANA_HOME/bin/python"
+        echo "   → Python: $FREVANA_HOME/bin/python3"
+        echo "   → Python: $FREVANA_HOME/bin/python"
+    else
+        echo "⚠️ Warning: Python3.12 binary not found at $python_bin"
+    fi
+    
+    if [ -f "$pip_bin" ]; then
+        ln -sf "$pip_bin" "$FREVANA_HOME/bin/pip3"
+        ln -sf "$pip_bin" "$FREVANA_HOME/bin/pip"
+        echo "   → pip: $FREVANA_HOME/bin/pip3"
+        echo "   → pip: $FREVANA_HOME/bin/pip"
+    else
+        echo "⚠️ Warning: pip3.12 binary not found at $pip_bin"
+    fi
 }
 
 # Verify installation
@@ -212,31 +151,23 @@ verify_installation() {
 
 # Main execution
 main() {
-    echo "🐍 Starting Python installation..."
+    echo "🐍 Starting Python installation via Homebrew..."
     if [ -n "$min_version" ]; then
         echo "📋 Minimum version required: $min_version"
     fi
     echo ""
     
-    local platform=$(detect_platform)
-    echo "📱 Detected platform: $platform"
+    # Check for Homebrew
+    local brew_cmd=$(check_homebrew)
+    echo "🍺 Using Homebrew: $brew_cmd"
     echo ""
     
-    # Determine target version
-    local target_version="3.12.2"
-    if [ -n "$min_version" ]; then
-        echo "🎯 Target version: $target_version (latest stable >= $min_version)"
-    else
-        echo "🎯 Using latest stable version: $target_version"
-    fi
+    # Install Python via Homebrew
+    install_python_homebrew "$brew_cmd" "$min_version"
     echo ""
     
-    # Download Python package
-    download_python "$platform"
-    echo ""
-    
-    # Install Python
-    install_python "$platform" "$target_version"
+    # Create symbolic links
+    create_python_links
     echo ""
     
     # Verify installation
