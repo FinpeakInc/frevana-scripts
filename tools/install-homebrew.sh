@@ -34,6 +34,23 @@ fi
 # Ensure directory structure exists
 mkdir -p "$FREVANA_HOME"/bin
 
+# Check Xcode Command Line Tools by downloading and executing check script
+check_xcode_tools() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "🔍 Checking Xcode Command Line Tools..."
+        
+        # Download and execute the Xcode tools check script
+        if command -v curl &> /dev/null; then
+            bash -c "$(curl -fsSL "$BASE_URL/tools/check-xcode-tools.sh")"
+        elif command -v wget &> /dev/null; then
+            bash -c "$(wget -qO- "$BASE_URL/tools/check-xcode-tools.sh")"
+        else
+            echo "❌ Error: Neither curl nor wget found" >&2
+            exit 1
+        fi
+    fi
+}
+
 # Detect OS and architecture
 detect_platform() {
     local os_type=""
@@ -82,6 +99,11 @@ detect_platform() {
 # Main execution
 main() {
     echo "🍺 Installing Homebrew..."
+    echo ""
+    
+    # Check Xcode Command Line Tools first (required for Homebrew)
+    export NONINTERACTIVE=1  # Enable non-interactive mode for automated installation
+    check_xcode_tools
     echo ""
     
     local platform=$(detect_platform)
