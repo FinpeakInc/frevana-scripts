@@ -182,11 +182,9 @@ else
     print_verbose "Continuing with local script configuration"
 fi
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Path to specific MCP script
-MCP_SCRIPT="$SCRIPT_DIR/$MCP_ID.sh"
+MCP_SCRIPT="$BASE_URL/tools/mcp/$MCP_ID.sh"
 
 # Check if MCP script exists
 if [ ! -f "$MCP_SCRIPT" ]; then
