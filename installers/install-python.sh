@@ -1,9 +1,55 @@
 #!/bin/bash
 
-# Universal Python Installer via Homebrew
-# Simplified installer using Homebrew for package management
+# Python Standalone Binary Installer
+# Uses python-build-standalone for dependency-free installation
 
 set -e
+
+# ================================
+# DEFAULT PYTHON VERSION
+# ================================
+# Default to latest stable version if not specified
+DEFAULT_PYTHON_VERSION="3.12.11"  # Latest stable as of 2024
+DEFAULT_BUILD_DATE="20250818"  # Latest build date from python-build-standalone
+
+# ================================
+# GLOBAL VARIABLES
+# ================================
+VERBOSE=false
+PYTHON_VERSION=""
+PIP_VERSION=""
+INSTALL_PATH=""
+
+# ================================
+# LOGGING FUNCTIONS
+# ================================
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "$@" >&2
+    fi
+}
+
+log_error() {
+    echo "❌ Error: $@" >&2
+}
+
+output_json() {
+    local success="$1"
+    local message="$2"
+    local python_version="${3:-}"
+    local pip_version="${4:-}"
+    local install_path="${5:-}"
+    
+    cat <<EOF
+{
+  "success": $success,
+  "message": "$message",
+  "python_version": "$python_version",
+  "pip_version": "$pip_version",
+  "install_path": "$install_path"
+}
+EOF
+}
 
 # ================================
 # FREVANA ENVIRONMENT SETUP
@@ -22,258 +68,365 @@ get_default_frevana_home() {
     esac
 }
 
-if [ -z "$FREVANA_HOME" ]; then
-    FREVANA_HOME=$(get_default_frevana_home)
-    echo "📂 FREVANA_HOME not set, using default: $FREVANA_HOME"
-else
-    echo "📂 Using provided FREVANA_HOME: $FREVANA_HOME"
-fi
+setup_environment() {
+    if [ -z "$FREVANA_HOME" ]; then
+        FREVANA_HOME=$(get_default_frevana_home)
+        log_verbose "📂 FREVANA_HOME not set, using default: $FREVANA_HOME"
+    else
+        log_verbose "📂 Using provided FREVANA_HOME: $FREVANA_HOME"
+    fi
+    
+    # Ensure directory structure exists
+    mkdir -p "$FREVANA_HOME"/bin
+    INSTALL_PATH="$FREVANA_HOME/bin"
+}
 
-# Ensure directory structure exists
-mkdir -p "$FREVANA_HOME"/bin
-
-# Parse command line arguments
-min_version=""
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --min-version=*)
-            min_version="${1#*=}"
-            shift
+# Detect system architecture and platform
+detect_system() {
+    local os=""
+    local arch=""
+    
+    # Detect OS
+    case "$(uname -s)" in
+        Darwin*)
+            os="apple-darwin"
+            ;;
+        Linux*)
+            # Check for musl vs glibc
+            if ldd --version 2>&1 | grep -q musl; then
+                os="unknown-linux-musl"
+            else
+                os="unknown-linux-gnu"
+            fi
+            ;;
+        MINGW* | MSYS* | CYGWIN*)
+            os="pc-windows-msvc-shared"
             ;;
         *)
-            echo "Unknown option: $1" >&2
+            output_json "false" "Unsupported operating system"
             exit 1
             ;;
     esac
-done
-
-# Check if Homebrew is available, install if missing
-check_homebrew() {
-    local brew_cmd="$FREVANA_HOME/bin/brew"
     
-    if [ -x "$brew_cmd" ]; then
-        return 0
-    fi
+    # Detect architecture
+    case "$(uname -m)" in
+        x86_64 | amd64)
+            arch="x86_64"
+            ;;
+        arm64 | aarch64)
+            arch="aarch64"
+            ;;
+        *)
+            output_json "false" "Unsupported architecture: $(uname -m)"
+            exit 1
+            ;;
+    esac
     
-    echo "🔍 Homebrew not found, installing automatically..." >&2
-    
-    # Install Homebrew using the install script with non-interactive mode
-    BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
-    export FREVANA_HOME="$FREVANA_HOME"
-    export NONINTERACTIVE=1
-    export HOMEBREW_NO_INSTALL_CLEANUP=1
-    export HOMEBREW_NO_AUTO_UPDATE=1
-    export HOMEBREW_NO_ENV_HINTS=1
-    
-    if command -v curl &> /dev/null; then
-        if bash -c "$(curl -fsSL "$BASE_URL/installers/install-homebrew.sh")" >/dev/null 2>&1; then
-            echo "✅ Homebrew installed successfully!" >&2
-        else
-            echo "❌ Error: Failed to install Homebrew" >&2
-            return 1
-        fi
-    elif command -v wget &> /dev/null; then
-        if bash -c "$(wget -qO- "$BASE_URL/installers/install-homebrew.sh")" >/dev/null 2>&1; then
-            echo "✅ Homebrew installed successfully!" >&2
-        else
-            echo "❌ Error: Failed to install Homebrew" >&2
-            return 1
-        fi
-    else
-        echo "❌ Error: Neither curl nor wget found" >&2
-        return 1
-    fi
-    
-    # Verify Homebrew is now available
-    if [ -x "$brew_cmd" ]; then
-        return 0
-    else
-        echo "❌ Error: Homebrew installation failed" >&2
-        return 1
-    fi
+    echo "${arch}-${os}"
 }
 
-# Select appropriate Python version based on minimum requirement
-select_python_version() {
+# Get appropriate Python version based on requirement
+get_python_version() {
     local min_version="$1"
     
     if [ -z "$min_version" ]; then
-        echo "python@3.12"  # Default to stable version
+        echo "$DEFAULT_PYTHON_VERSION"
         return
     fi
     
     # Parse major.minor from min_version
-    local major_minor=$(echo "$min_version" | cut -d'.' -f1-2)
+    local major_minor=$(echo "$min_version" | grep -oE '^[0-9]+\.[0-9]+')
     
     case "$major_minor" in
-        "3.13"*|"3.14"*|"3.15"*)
-            # Try 3.13 first, fallback to 3.12
-            echo "python@3.13"
+        "3.13")
+            echo "3.13.1"  # Latest 3.13
             ;;
-        "3.12"*)
-            echo "python@3.12"
+        "3.12")
+            echo "3.12.11"  # Latest 3.12
             ;;
-        "3.11"*)
-            echo "python@3.11"
+        "3.11")
+            echo "3.11.13"  # Latest 3.11
+            ;;
+        "3.10")
+            echo "3.10.17"  # Latest 3.10
+            ;;
+        "3.9")
+            echo "3.9.21"  # Latest 3.9
             ;;
         *)
-            # For other versions, use latest stable
-            echo "python@3.12"
+            echo "$DEFAULT_PYTHON_VERSION"
             ;;
     esac
 }
 
-# Install Python via Homebrew
-install_python_homebrew() {
-    local brew_cmd="$1"
-    local min_version="$2"
+# Download Python from python-build-standalone
+download_python() {
+    local version="$1"
+    local platform="$2"
+    local target_dir="$3"
     
-    # Set up isolated Homebrew environment with non-interactive mode
-    export HOMEBREW_PREFIX="$FREVANA_HOME"
-    export HOMEBREW_CELLAR="$FREVANA_HOME/Cellar"
-    export HOMEBREW_REPOSITORY="$FREVANA_HOME/homebrew"
-    export HOMEBREW_CACHE="$FREVANA_HOME/Cache"
-    export HOMEBREW_LOGS="$FREVANA_HOME/Logs"
-    export HOMEBREW_NO_AUTO_UPDATE=1
-    export HOMEBREW_NO_ENV_HINTS=1
-    export HOMEBREW_NO_INSTALL_CLEANUP=1
-    export NONINTERACTIVE=1
+    # Construct download URL for python-build-standalone
+    local base_url="https://github.com/astral-sh/python-build-standalone/releases/download"
+    local date_tag="$DEFAULT_BUILD_DATE"
     
-    # Determine Python formula based on version requirement
-    local python_formula=$(select_python_version "$min_version")
-    if [ -n "$min_version" ]; then
-        echo "🎯 Installing Python >= $min_version (using $python_formula)"
-    else
-        echo "🎯 Installing latest Python ($python_formula)"
+    # Use install_only variant for simplicity (no zstd required)
+    local variant="install_only"
+    local file_ext="tar.gz"
+    
+    # Adjust platform string for python-build-standalone naming convention
+    local download_platform="$platform"
+    if [[ "$platform" == "x86_64-unknown-linux-gnu" ]]; then
+        download_platform="x86_64_v3-unknown-linux-gnu"  # Use v3 for better compatibility
     fi
     
-    # Install Python using Homebrew with fallback
-    echo "📦 Installing Python..."
-    if "$brew_cmd" install "$python_formula"; then
-        echo "✅ Python installed successfully!"
-    else
-        echo "⚠️ Failed to install $python_formula, trying fallback version..."
-        # Fallback to python@3.12 if the requested version fails
-        if [ "$python_formula" != "python@3.12" ]; then
-            python_formula="python@3.12"
-            echo "📦 Installing fallback Python ($python_formula)..."
-            if "$brew_cmd" install "$python_formula"; then
-                echo "✅ Fallback Python installed successfully!"
-            else
-                echo "❌ Error: Python installation failed even with fallback" >&2
-                exit 1
+    # Build filename
+    local filename="cpython-${version}+${date_tag}-${download_platform}-${variant}.${file_ext}"
+    local url="${base_url}/${date_tag}/${filename}"
+    
+    log_verbose "📥 Downloading Python ${version} for ${platform}..."
+    log_verbose "   → URL: $url"
+    
+    # Create temp directory
+    local temp_dir="$(mktemp -d)"
+    local download_file="${temp_dir}/python.tar.gz"
+    
+    # Download with retries
+    local max_retries=3
+    local retry=0
+    
+    while [ $retry -lt $max_retries ]; do
+        if command -v curl &> /dev/null; then
+            if curl -L -f -o "$download_file" "$url" 2>/dev/null; then
+                break
             fi
-        else
-            echo "❌ Error: Python installation failed" >&2
-            exit 1
+        elif command -v wget &> /dev/null; then
+            if wget -q -O "$download_file" "$url" 2>/dev/null; then
+                break
+            fi
         fi
+        
+        retry=$((retry + 1))
+        if [ $retry -lt $max_retries ]; then
+            log_verbose "   ⚠️ Download failed, retrying... (attempt $((retry + 1))/$max_retries)"
+            sleep 2
+        fi
+    done
+    
+    if [ $retry -eq $max_retries ]; then
+        rm -rf "$temp_dir"
+        return 1
     fi
     
+    # Extract
+    log_verbose "📦 Extracting Python..."
+    tar -xzf "$download_file" -C "$temp_dir" || {
+        rm -rf "$temp_dir"
+        return 1
+    }
+    
+    # Find the extracted directory (should be 'python')
+    local extracted_dir="${temp_dir}/python"
+    
+    if [ ! -d "$extracted_dir" ]; then
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Move to target directory
+    if [ -d "$target_dir" ]; then
+        log_verbose "🗑️  Removing old Python installation..."
+        rm -rf "$target_dir"
+    fi
+    
+    mkdir -p "$(dirname "$target_dir")"
+    mv "$extracted_dir" "$target_dir"
+    
+    # Cleanup
+    rm -rf "$temp_dir"
+    
+    log_verbose "✅ Python downloaded and extracted successfully!"
     return 0
 }
 
 # Create symbolic links for Python
 create_python_links() {
-    echo "🔗 Creating symbolic links..."
+    local python_dir="$1"
     
-    # Create python and pip links pointing to python3 and pip3
-    # (python3 and pip3 should already be created by Homebrew)
+    log_verbose "🔗 Creating symbolic links..."
     
-    # Create python -> python3 link
-    if [ -f "$FREVANA_HOME/bin/python3" ]; then
-        ln -sf python3 "$FREVANA_HOME/bin/python"
-        echo "   → python → python3"
-    else
-        echo "⚠️ Warning: python3 not found in $FREVANA_HOME/bin"
+    # Find the actual Python binary (e.g., python3.12)
+    local python_bin=""
+    for py in "$python_dir"/bin/python3.*; do
+        if [ -f "$py" ] && [ ! -L "$py" ]; then
+            python_bin="$py"
+            break
+        fi
+    done
+    
+    if [ -z "$python_bin" ]; then
+        return 1
     fi
     
-    # Create pip -> pip3 link  
-    if [ -f "$FREVANA_HOME/bin/pip3" ]; then
-        ln -sf pip3 "$FREVANA_HOME/bin/pip"
-        echo "   → pip → pip3"
-    else
-        echo "⚠️ Warning: pip3 not found in $FREVANA_HOME/bin"
+    local python_version=$(basename "$python_bin")
+    
+    # Create links in FREVANA_HOME/bin
+    # Link the specific version
+    ln -sf "$python_bin" "$FREVANA_HOME/bin/$python_version"
+    log_verbose "   → $python_version"
+    
+    # Create python3 link
+    ln -sf "$python_bin" "$FREVANA_HOME/bin/python3"
+    log_verbose "   → python3 → $python_version"
+    
+    # Create python link
+    ln -sf "$python_bin" "$FREVANA_HOME/bin/python"
+    log_verbose "   → python → $python_version"
+    
+    # Link pip if it exists
+    if [ -f "$python_dir/bin/pip3" ]; then
+        ln -sf "$python_dir/bin/pip3" "$FREVANA_HOME/bin/pip3"
+        ln -sf "$python_dir/bin/pip3" "$FREVANA_HOME/bin/pip"
+        log_verbose "   → pip3"
+        log_verbose "   → pip → pip3"
     fi
+    
+    # Link pip with version if it exists (e.g., pip3.12)
+    for pip in "$python_dir"/bin/pip3.*; do
+        if [ -f "$pip" ]; then
+            local pip_name=$(basename "$pip")
+            ln -sf "$pip" "$FREVANA_HOME/bin/$pip_name"
+            log_verbose "   → $pip_name"
+        fi
+    done
+    
+    return 0
 }
 
-# Verify installation
-verify_installation() {
-    echo "✅ Verifying Python installation..."
+# Ensure pip is installed
+ensure_pip() {
+    local python_cmd="$1"
     
-    # Test both python3/python and pip3/pip
-    local python3_cmd="$FREVANA_HOME/bin/python3"
-    local python_cmd="$FREVANA_HOME/bin/python"
-    local pip3_cmd="$FREVANA_HOME/bin/pip3"
-    local pip_cmd="$FREVANA_HOME/bin/pip"
+    log_verbose "📦 Ensuring pip is installed..."
     
-    # Check python3 and python
-    if [ -x "$python3_cmd" ]; then
-        local python3_version=$($python3_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
-        echo "   → python3 version: $python3_version"
-        echo "   → python3 location: $python3_cmd"
-    else
-        echo "   ⚠️ python3 not found at $python3_cmd"
+    # Check if pip already exists
+    if "$python_cmd" -m pip --version >/dev/null 2>&1; then
+        log_verbose "   → pip is already installed"
+        return 0
     fi
     
-    if [ -x "$python_cmd" ]; then
-        local python_version=$($python_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
-        echo "   → python version: $python_version"
-        echo "   → python location: $python_cmd"
+    # Download and install pip
+    log_verbose "   → Installing pip..."
+    local temp_file="$(mktemp)"
+    
+    if command -v curl &> /dev/null; then
+        curl -s https://bootstrap.pypa.io/get-pip.py -o "$temp_file"
+    elif command -v wget &> /dev/null; then
+        wget -q https://bootstrap.pypa.io/get-pip.py -O "$temp_file"
     else
-        echo "   ⚠️ python not found at $python_cmd"
+        rm -f "$temp_file"
+        return 1
     fi
     
-    # Check pip3 and pip
-    if [ -x "$pip3_cmd" ]; then
-        local pip3_version=$($pip3_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
-        echo "   → pip3 version: $pip3_version"
-        echo "   → pip3 location: $pip3_cmd"
+    if "$python_cmd" "$temp_file" --user >/dev/null 2>&1; then
+        log_verbose "   → pip installed successfully"
+        rm -f "$temp_file"
+        return 0
     else
-        echo "   ⚠️ pip3 not found at $pip3_cmd"
-    fi
-    
-    if [ -x "$pip_cmd" ]; then
-        local pip_version=$($pip_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
-        echo "   → pip version: $pip_version"
-        echo "   → pip location: $pip_cmd"
-    else
-        echo "   ⚠️ pip not found at $pip_cmd"
+        rm -f "$temp_file"
+        return 1
     fi
 }
 
 # Main execution
 main() {
-    echo "🐍 Starting Python installation via Homebrew..."
-    if [ -n "$min_version" ]; then
-        echo "📋 Minimum version required: $min_version"
-    fi
-    echo ""
+    local min_version=""
     
-    # Check for Homebrew
-    if check_homebrew; then
-        local brew_cmd="$FREVANA_HOME/bin/brew"
-        echo "🍺 Using Homebrew: $brew_cmd"
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --min-version=*)
+                min_version="${1#*=}"
+                shift
+                ;;
+            --verbose|-v)
+                VERBOSE=true
+                shift
+                ;;
+            *)
+                output_json "false" "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    log_verbose "🐍 Installing Python Standalone Binary..."
+    if [ -n "$min_version" ]; then
+        log_verbose "📋 Minimum version required: $min_version"
+    fi
+    log_verbose ""
+    
+    # Setup environment
+    setup_environment
+    
+    # Detect system
+    local platform=$(detect_system)
+    log_verbose "🖥️  Detected platform: $platform"
+    
+    # Get Python version
+    local python_version=$(get_python_version "$min_version")
+    log_verbose "🎯 Installing Python $python_version"
+    log_verbose ""
+    
+    # Download and install Python
+    local python_dir="$FREVANA_HOME/python"
+    if download_python "$python_version" "$platform" "$python_dir"; then
+        log_verbose ""
     else
-        echo "❌ Error: Could not install or find Homebrew" >&2
+        output_json "false" "Failed to download Python after multiple attempts"
         exit 1
     fi
-    echo ""
-    
-    # Install Python via Homebrew
-    local python_formula=$(select_python_version "$min_version")
-    install_python_homebrew "$brew_cmd" "$min_version"
-    echo ""
     
     # Create symbolic links
-    create_python_links "$python_formula"
-    echo ""
+    if ! create_python_links "$python_dir"; then
+        output_json "false" "Python binary not found in $python_dir/bin"
+        exit 1
+    fi
+    log_verbose ""
+    
+    # Ensure pip is installed
+    ensure_pip "$FREVANA_HOME/bin/python"
+    log_verbose ""
     
     # Verify installation
-    verify_installation
-    echo ""
+    log_verbose "✅ Verifying Python installation..."
+    local python_path="$FREVANA_HOME/bin/python"
+    local pip_path="$FREVANA_HOME/bin/pip"
     
-    echo "✅ Python installation completed successfully!"
-    echo "🎉 You can now use 'python', 'python3', 'pip', and 'pip3' commands"
+    if [ -x "$python_path" ] && "$python_path" --version >/dev/null 2>&1; then
+        PYTHON_VERSION=$("$python_path" --version 2>&1)
+        log_verbose "   → Python version: $PYTHON_VERSION"
+        log_verbose "   → Python location: $python_path"
+        
+        if [ -x "$pip_path" ] || "$python_path" -m pip --version >/dev/null 2>&1; then
+            PIP_VERSION=$("$python_path" -m pip --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+            log_verbose "   → pip version: $PIP_VERSION"
+        fi
+    else
+        output_json "false" "Python verification failed"
+        exit 1
+    fi
+    
+    log_verbose ""
+    log_verbose "✅ Python installation completed successfully!"
+    log_verbose "🎉 You can now use 'python', 'python3', 'pip', and 'pip3' commands"
+    log_verbose ""
+    log_verbose "To get started:"
+    log_verbose "  python --version"
+    log_verbose "  pip --version"
+    log_verbose "  python -m pip install <package>"
+    
+    # Output JSON result
+    output_json "true" "Python installation completed successfully" "$PYTHON_VERSION" "$PIP_VERSION" "$INSTALL_PATH"
 }
 
 # Run main function
