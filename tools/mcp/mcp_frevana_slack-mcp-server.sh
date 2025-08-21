@@ -58,6 +58,7 @@ if [ -z "$FREVANA_HOME" ]; then
 fi
 
 # Set npm/npx path with FREVANA_HOME prefix
+NPM_CMD="$FREVANA_HOME/bin/npm"
 NPX_CMD="$FREVANA_HOME/bin/npx"
 
 # Check if npx exists
@@ -66,5 +67,11 @@ if [ ! -f "$NPX_CMD" ]; then
     echo "Please ensure Node.js is properly installed in FREVANA_HOME."
     exit 1
 fi
+
+# Pre-install slack-mcp-server package to avoid installation delay during runtime
+echo "Installing slack-mcp-server package..."
+$NPM_CMD install slack-mcp-server@latest || {
+    echo "Warning: Failed to pre-install slack-mcp-server package. It will be installed on first use."
+}
 
 echo "MCP Slack Server installed"

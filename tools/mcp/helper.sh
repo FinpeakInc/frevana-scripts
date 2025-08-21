@@ -32,13 +32,20 @@ print_info() {
     echo -e "${YELLOW}$1${NC}"
 }
 
+print_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo -e "${YELLOW}[VERBOSE] $1${NC}"
+    fi
+}
+
 # Function to display usage
 usage() {
-    echo "Usage: $0 --mcp-id=<MCP_ID> [--install]"
+    echo "Usage: $0 --mcp-id=<MCP_ID> [--install] [--verbose]"
     echo ""
     echo "Options:"
     echo "  --mcp-id=<MCP_ID>   Required. The MCP ID to install/configure"
     echo "  --install           Optional. Install missing dependencies automatically"
+    echo "  --verbose           Optional. Show detailed output and debug information"
     echo ""
     exit 1
 }
@@ -46,6 +53,7 @@ usage() {
 # Parse command line arguments
 MCP_ID=""
 INSTALL_FLAG=false
+VERBOSE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -55,6 +63,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --install)
             INSTALL_FLAG=true
+            shift
+            ;;
+        --verbose)
+            VERBOSE=true
             shift
             ;;
         --help|-h)
@@ -101,15 +113,16 @@ export FREVANA_HOME
 mkdir -p "$FREVANA_HOME"/bin
 
 print_info "Processing MCP: $MCP_ID"
-print_info "FREVANA_HOME: $FREVANA_HOME"
-print_info "Install flag: $INSTALL_FLAG"
+print_verbose "FREVANA_HOME: $FREVANA_HOME"
+print_verbose "Install flag: $INSTALL_FLAG"
+print_verbose "Verbose mode: $VERBOSE"
 
 # Function to fetch MCP configuration from marketplace
 fetch_mcp_config() {
     local mcp_id="$1"
     local config_json=""
     
-    print_info "Fetching MCP configuration from marketplace..."
+    print_verbose "Fetching MCP configuration from marketplace..."
     
     # Download the marketplace config
     if command -v curl &> /dev/null; then
@@ -144,7 +157,7 @@ fetch_mcp_config() {
         
         print_success "Found MCP: $MCP_NAME by $MCP_AUTHOR"
     else
-        print_info "jq not found, using basic parsing"
+        print_verbose "jq not found, using basic parsing"
         # Basic parsing without jq (less reliable but works for simple cases)
         MCP_NAME=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"name"' | head -1 | sed 's/.*"name".*:.*"\([^"]*\)".*/\1/')
         MCP_PACKAGER=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"packager"' | head -1 | sed 's/.*"packager".*:.*"\([^"]*\)".*/\1/')
@@ -164,9 +177,9 @@ fetch_mcp_config() {
 
 # Try to fetch MCP config from marketplace (optional - continue even if it fails)
 if fetch_mcp_config "$MCP_ID"; then
-    print_info "Using marketplace configuration for $MCP_NAME"
+    print_verbose "Using marketplace configuration for $MCP_NAME"
 else
-    print_info "Continuing with local script configuration"
+    print_verbose "Continuing with local script configuration"
 fi
 
 # Get script directory
@@ -185,10 +198,10 @@ fi
 # Extract prerequisites - prefer marketplace config, fallback to script
 if [ -n "$MCP_PREREQUISITES" ]; then
     PREREQS="$MCP_PREREQUISITES"
-    print_info "Using prerequisites from marketplace: $PREREQS"
+    print_verbose "Using prerequisites from marketplace: $PREREQS"
 else
     PREREQS=$(grep "^# command_preq:" "$MCP_SCRIPT" | sed 's/# command_preq: //')
-    print_info "Using prerequisites from script: $PREREQS"
+    print_verbose "Using prerequisites from script: $PREREQS"
 fi
 
 if [ -z "$PREREQS" ]; then
@@ -196,7 +209,7 @@ if [ -z "$PREREQS" ]; then
     exit 1
 fi
 
-print_info "Prerequisites for $MCP_ID: $PREREQS"
+print_verbose "Prerequisites for $MCP_ID: $PREREQS"
 
 # Environment check script URL
 ENV_CHECK_URL="$BASE_URL/tools/environment-check.sh"
@@ -207,7 +220,7 @@ check_command() {
     local min_version="${2:-}"  # Optional minimum version
     local check_result=""
     
-    print_info "Checking $cmd with environment-check.sh..."
+    print_verbose "Checking $cmd with environment-check.sh..."
     
     # Use environment-check.sh to check the command
     if [ -n "$min_version" ]; then
@@ -228,7 +241,7 @@ check_command() {
                 print_success "✓ $cmd is ready (version: $version)"
                 return 0
             else
-                print_info "Status: $message"
+                print_verbose "Status: $message"
                 return 1
             fi
         else
@@ -248,15 +261,15 @@ install_dependency() {
     case "$dep" in
         node)
             url="$URL_NODE"
-            print_info "Installing Node.js..."
+            print_verbose "Installing Node.js..."
             ;;
         python)
             url="$URL_PYTHON"
-            print_info "Installing Python..."
+            print_verbose "Installing Python..."
             ;;
         uv)
             url="$URL_UV"
-            print_info "Installing uv..."
+            print_verbose "Installing uv..."
             ;;
         *)
             print_error "Unknown dependency: $dep"
@@ -283,7 +296,7 @@ for prereq in "${PREREQ_ARRAY[@]}"; do
     # Trim whitespace
     prereq=$(echo "$prereq" | xargs)
     
-    print_info "Checking for $prereq..."
+    print_verbose "Checking for $prereq..."
     
     # Map prerequisite to actual command and minimum version to check
     check_cmd=""
@@ -350,14 +363,19 @@ for prereq in "${PREREQ_ARRAY[@]}"; do
     fi
 done
 
-print_info "All prerequisites satisfied. Running MCP script..."
+print_verbose "All prerequisites satisfied."
 
-# Execute the MCP script
-if bash "$MCP_SCRIPT"; then
-    print_success "✓ MCP $MCP_ID installed successfully!"
+# Execute the MCP script only if --install flag is provided
+if [ "$INSTALL_FLAG" = true ]; then
+    print_verbose "Running MCP installation script..."
+    if bash "$MCP_SCRIPT"; then
+        print_success "✓ MCP $MCP_ID installed successfully!"
+    else
+        print_error "Failed to install MCP $MCP_ID"
+        exit 1
+    fi
 else
-    print_error "Failed to install MCP $MCP_ID"
-    exit 1
+    print_info "Prerequisites check completed. Use --install to run MCP installation."
 fi
 
 print_success "Done!"

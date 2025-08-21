@@ -174,58 +174,25 @@ install_python_homebrew() {
 
 # Create symbolic links for Python
 create_python_links() {
-    local python_formula="$1"
     echo "🔗 Creating symbolic links..."
     
-    # Extract version from formula (e.g., python@3.12 -> 3.12)
-    local version_suffix=$(echo "$python_formula" | sed 's/python@//')
+    # Create python and pip links pointing to python3 and pip3
+    # (python3 and pip3 should already be created by Homebrew)
     
-    # Find Python binaries in Homebrew installation
-    local python_bin="$FREVANA_HOME/bin/python$version_suffix"
-    local pip_bin="$FREVANA_HOME/bin/pip$version_suffix"
-    
-    # Also check without version suffix for latest python
-    if [ ! -f "$python_bin" ] && [ "$python_formula" = "python" ]; then
-        python_bin="$FREVANA_HOME/bin/python3"
-        pip_bin="$FREVANA_HOME/bin/pip3"
+    # Create python -> python3 link
+    if [ -f "$FREVANA_HOME/bin/python3" ]; then
+        ln -sf python3 "$FREVANA_HOME/bin/python"
+        echo "   → python → python3"
+    else
+        echo "⚠️ Warning: python3 not found in $FREVANA_HOME/bin"
     fi
     
-    # Create python/python3 links
-    if [ -f "$python_bin" ]; then
-        ln -sf "$python_bin" "$FREVANA_HOME/bin/python3"
-        ln -sf "$python_bin" "$FREVANA_HOME/bin/python"
-        echo "   → Python: $FREVANA_HOME/bin/python3 → $python_bin"
-        echo "   → Python: $FREVANA_HOME/bin/python → $python_bin"
+    # Create pip -> pip3 link  
+    if [ -f "$FREVANA_HOME/bin/pip3" ]; then
+        ln -sf pip3 "$FREVANA_HOME/bin/pip"
+        echo "   → pip → pip3"
     else
-        echo "⚠️ Warning: Python binary not found at $python_bin"
-        # Try to find any python3.x binary
-        local found_python=$(find "$FREVANA_HOME/bin" -name "python3.*" | head -n1)
-        if [ -n "$found_python" ]; then
-            echo "🔍 Found alternative: $found_python"
-            ln -sf "$found_python" "$FREVANA_HOME/bin/python3"
-            ln -sf "$found_python" "$FREVANA_HOME/bin/python"
-            echo "   → Python: $FREVANA_HOME/bin/python3 → $found_python"
-            echo "   → Python: $FREVANA_HOME/bin/python → $found_python"
-        fi
-    fi
-    
-    # Create pip/pip3 links
-    if [ -f "$pip_bin" ]; then
-        ln -sf "$pip_bin" "$FREVANA_HOME/bin/pip3"
-        ln -sf "$pip_bin" "$FREVANA_HOME/bin/pip"
-        echo "   → pip: $FREVANA_HOME/bin/pip3 → $pip_bin"
-        echo "   → pip: $FREVANA_HOME/bin/pip → $pip_bin"
-    else
-        echo "⚠️ Warning: pip binary not found at $pip_bin"
-        # Try to find any pip3.x binary
-        local found_pip=$(find "$FREVANA_HOME/bin" -name "pip3.*" | head -n1)
-        if [ -n "$found_pip" ]; then
-            echo "🔍 Found alternative: $found_pip"
-            ln -sf "$found_pip" "$FREVANA_HOME/bin/pip3"
-            ln -sf "$found_pip" "$FREVANA_HOME/bin/pip"
-            echo "   → pip: $FREVANA_HOME/bin/pip3 → $found_pip"
-            echo "   → pip: $FREVANA_HOME/bin/pip → $found_pip"
-        fi
+        echo "⚠️ Warning: pip3 not found in $FREVANA_HOME/bin"
     fi
 }
 
@@ -233,29 +200,45 @@ create_python_links() {
 verify_installation() {
     echo "✅ Verifying Python installation..."
     
-    local python_cmd="python3"
-    local pip_cmd="pip3"
+    # Test both python3/python and pip3/pip
+    local python3_cmd="$FREVANA_HOME/bin/python3"
+    local python_cmd="$FREVANA_HOME/bin/python"
+    local pip3_cmd="$FREVANA_HOME/bin/pip3"
+    local pip_cmd="$FREVANA_HOME/bin/pip"
     
-    # Use FREVANA_HOME versions if available
-    if [ -f "$FREVANA_HOME/bin/python3" ]; then
-        python_cmd="$FREVANA_HOME/bin/python3"
-    elif [ -f "$FREVANA_HOME/bin/python3.exe" ]; then
-        python_cmd="$FREVANA_HOME/bin/python3.exe"
+    # Check python3 and python
+    if [ -x "$python3_cmd" ]; then
+        local python3_version=$($python3_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+        echo "   → python3 version: $python3_version"
+        echo "   → python3 location: $python3_cmd"
+    else
+        echo "   ⚠️ python3 not found at $python3_cmd"
     fi
     
-    if [ -f "$FREVANA_HOME/bin/pip3" ]; then
-        pip_cmd="$FREVANA_HOME/bin/pip3"
-    elif [ -f "$FREVANA_HOME/bin/pip3.exe" ]; then
-        pip_cmd="$FREVANA_HOME/bin/pip3.exe"
+    if [ -x "$python_cmd" ]; then
+        local python_version=$($python_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+        echo "   → python version: $python_version"
+        echo "   → python location: $python_cmd"
+    else
+        echo "   ⚠️ python not found at $python_cmd"
     fi
     
-    local python_version=$($python_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
-    local pip_version=$($pip_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+    # Check pip3 and pip
+    if [ -x "$pip3_cmd" ]; then
+        local pip3_version=$($pip3_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+        echo "   → pip3 version: $pip3_version"
+        echo "   → pip3 location: $pip3_cmd"
+    else
+        echo "   ⚠️ pip3 not found at $pip3_cmd"
+    fi
     
-    echo "   → Python version: $python_version"
-    echo "   → pip version: $pip_version"
-    echo "   → Python location: $python_cmd"
-    echo "   → pip location: $pip_cmd"
+    if [ -x "$pip_cmd" ]; then
+        local pip_version=$($pip_cmd --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+        echo "   → pip version: $pip_version"
+        echo "   → pip location: $pip_cmd"
+    else
+        echo "   ⚠️ pip not found at $pip_cmd"
+    fi
 }
 
 # Main execution
@@ -290,11 +273,7 @@ main() {
     echo ""
     
     echo "✅ Python installation completed successfully!"
-    echo "🎉 You can now use 'python3' and 'pip3' commands"
-    echo ""
-    echo "To get started:"
-    echo "  python3 --version"
-    echo "  pip3 --version"
+    echo "🎉 You can now use 'python', 'python3', 'pip', and 'pip3' commands"
 }
 
 # Run main function

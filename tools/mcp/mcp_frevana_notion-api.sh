@@ -57,6 +57,7 @@ if [ -z "$FREVANA_HOME" ]; then
 fi
 
 # Set npm/npx path with FREVANA_HOME prefix
+NPM_CMD="$FREVANA_HOME/bin/npm"
 NPX_CMD="$FREVANA_HOME/bin/npx"
 
 # Check if npx exists
@@ -65,5 +66,11 @@ if [ ! -f "$NPX_CMD" ]; then
     echo "Please ensure Node.js is properly installed in FREVANA_HOME."
     exit 1
 fi
+
+# Pre-install @notionhq/notion-mcp-server package to avoid installation delay during runtime
+echo "Installing @notionhq/notion-mcp-server package..."
+$NPM_CMD install @notionhq/notion-mcp-server || {
+    echo "Warning: Failed to pre-install @notionhq/notion-mcp-server package. It will be installed on first use."
+}
 
 echo "MCP Notion API installed"

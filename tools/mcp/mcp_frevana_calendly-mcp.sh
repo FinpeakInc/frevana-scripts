@@ -57,6 +57,7 @@ if [ -z "$FREVANA_HOME" ]; then
 fi
 
 # Set npm/npx path with FREVANA_HOME prefix
+NPM_CMD="$FREVANA_HOME/bin/npm"
 NPX_CMD="$FREVANA_HOME/bin/npx"
 
 # Check if npx exists
@@ -64,5 +65,11 @@ if [ ! -f "$NPX_CMD" ]; then
     echo "Error: npx not found at $NPX_CMD"
     exit 1
 fi
+
+# Pre-install calendly-mcp-server package to avoid installation delay during runtime
+echo "Installing calendly-mcp-server package..."
+$NPM_CMD install calendly-mcp-server || {
+    echo "Warning: Failed to pre-install calendly-mcp-server package. It will be installed on first use."
+}
 
 echo "MCP Calendly installed"
