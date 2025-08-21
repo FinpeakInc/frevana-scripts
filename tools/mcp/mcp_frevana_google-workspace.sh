@@ -92,10 +92,6 @@ if [ ! -f "$UVX_CMD" ]; then
     exit 1
 fi
 
-# Pre-install workspace-mcp package to avoid installation delay during runtime
-echo "Installing workspace-mcp package..."
-$UV_CMD add workspace-mcp || {
-    echo "Warning: Failed to pre-install workspace-mcp package. It will be installed on first use."
-}
+# Let UVX install workspace-mcp
 
-echo "MCP Google Workspace installed"
+echo "MCP Google Workspace is ready"

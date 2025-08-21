@@ -73,4 +73,4 @@ $NPM_CMD install @netlify/mcp || {
     echo "Warning: Failed to pre-install @netlify/mcp package. It will be installed on first use."
 }
 
-echo "MCP Netlify installed"
+echo "MCP Netlify is ready"
