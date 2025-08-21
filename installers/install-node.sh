@@ -206,14 +206,43 @@ main() {
         exit 1
     fi
     
+    # Install pnpm via npm
+    echo ""
+    echo "📦 Installing pnpm..."
+    if "$npm_path" install -g pnpm; then
+        echo "✅ pnpm installed successfully!"
+        
+        # Create symbolic link for pnpm
+        local pnpm_source="$FREVANA_HOME/lib/node_modules/pnpm/bin/pnpm.cjs"
+        local pnpm_target="$FREVANA_HOME/bin/pnpm"
+        
+        if [ -f "$pnpm_source" ]; then
+            [ -L "$pnpm_target" ] && rm "$pnpm_target"
+            ln -s "$pnpm_source" "$pnpm_target"
+            chmod +x "$pnpm_target"
+            echo "   → pnpm link created: $pnpm_target"
+            
+            # Verify pnpm installation
+            if [ -x "$pnpm_target" ] && "$pnpm_target" --version >/dev/null 2>&1; then
+                local pnpm_version=$("$pnpm_target" --version)
+                echo "   → pnpm version: $pnpm_version"
+            fi
+        else
+            echo "⚠️ Warning: pnpm binary not found at expected location"
+        fi
+    else
+        echo "⚠️ Warning: pnpm installation failed, but Node.js is installed successfully"
+    fi
+    
     echo ""
     echo "✅ Node.js installation completed successfully!"
-    echo "🎉 You can now use 'node', 'npm', and 'npx' commands"
+    echo "🎉 You can now use 'node', 'npm', 'npx', and 'pnpm' commands"
     echo ""
     echo "To get started:"
     echo "  node --version"
     echo "  npm --version"
     echo "  npx --version"
+    echo "  pnpm --version"
 }
 
 # Create symbolic links for Node.js

@@ -1,0 +1,112 @@
+[
+  {
+    "id": "mcp_frevana_server-filesystem",
+    "name": "Server Filesystem",
+    "description": "A server filesystem service that provides file system access capabilities",
+    "author": "ModelContextProtocol",
+    "packager": "npm",
+    "package_name": "@modelcontextprotocol/server-filesystem",
+    "min_version": "",
+    "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_notion-api",
+    "name": "Notion",
+    "description": "Connect to Notion workspace for reading and writing pages, databases, and blocks through the Notion API",
+    "author": "Notion",
+    "packager": "npm",
+    "package_name": "@notionhq/notion-mcp-server",
+    "min_version": "",
+    "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_slack-mcp-server",
+    "name": "Slack",
+    "description": "The most powerful MCP Slack Server with no permission requirements, Apps support, multiple transports Stdio and SSE, DMs, Group DMs and smart history fetch logic",
+    "author": "korotovsky",
+    "packager": "npm",
+    "package_name": "slack-mcp-server",
+    "min_version": "",
+    "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_ga4-mcp-server",
+    "name": "Google Analytics",
+    "description": "Connect to Google Analytics for reading and writing events, user properties, and custom dimensions and metrics",
+    "author": "surendranb",
+    "packager": "pip",
+    "package_name": "google-analytics-mcp",
+    "min_version": "",
+    "prerequisites": ["python"]
+  },
+  {
+    "id": "mcp_frevana_google-workspace",
+    "name": "Google Workspace",
+    "description": "Connect to Google Workspace for reading and writing documents, spreadsheets, and presentations",
+    "author": "taylorwilsdon",
+    "packager": "uv",
+    "package_name": "workspace-mcp",
+    "min_version": "",
+    "prerequisites": ["python", "uv"]
+  },
+  {
+    "id": "mcp_frevana_chrome-automation",
+    "name": "Chrome Automation",
+    "description": "Chrome Automation MCP powered by Playwright",
+    "author": "JackZhao98",
+    "packager": "npm",
+    "package_name": "chrome-automation-mcp-lite",
+    "min_version": "",
+    "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_zoom-mcp-server",
+    "name": "Zoom MCP Server",
+    "description": "A Model Context Protocol server for integrating with Zoom video conferencing platform",
+    "author": "javaprogrammerlb",
+    "packager": "npm",
+    "package_name": "@yitianyigexiangfa/zoom-mcp-server",
+    "min_version": "",
+    "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_figma-developer-mcp",
+    "name": "Framelink Figma MCP",
+    "description": "MCP server to provide Figma layout information to AI coding agents like Cursor",
+    "author": "GLips",
+    "packager": "npm",
+    "package_name": "figma-developer-mcp",
+    "min_version": "",
+    "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_netlify-mcp",
+    "name": "Netlify MCP",
+    "description": "A Model Context Protocol server for integrating with Netlify deployment platform",
+    "author": "Netlify",
+    "packager": "npm",
+    "package_name": "@netlify/mcp",
+    "min_version": "",
+    "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_sentry-mcp",
+    "name": "Sentry",
+    "description": "A Model Context Protocol server for integrating with Sentry error tracking platform",
+    "author": "Sentry",
+    "packager": "npm",
+    "package_name": "@sentry/mcp-server",
+    "min_version": "",
+    "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_calendly-mcp",
+    "name": "Calendly",
+    "description": "A Model Context Protocol server for integrating with Calendly",
+    "author": "meAmitPatil",
+    "packager": "npm",
+    "package_name": "calendly-mcp-server",
+    "min_version": "",
+    "prerequisites": ["node"]
+  }
+]
