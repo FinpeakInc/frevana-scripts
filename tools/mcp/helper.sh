@@ -186,13 +186,6 @@ fi
 # Path to specific MCP script
 MCP_SCRIPT="$BASE_URL/tools/mcp/$MCP_ID.sh"
 
-# Check if MCP script exists (using HTTP status check for URL)
-if ! curl -s --head "$MCP_SCRIPT" | head -n 1 | grep -q "200 OK"; then
-    print_error "MCP script not found: $MCP_SCRIPT"
-    print_error "Invalid MCP ID: $MCP_ID"
-    exit 1
-fi
-
 # Extract prerequisites - prefer marketplace config, fallback to script
 if [ -n "$MCP_PREREQUISITES" ]; then
     PREREQS="$MCP_PREREQUISITES"
