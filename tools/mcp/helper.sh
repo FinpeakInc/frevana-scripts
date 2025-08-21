@@ -94,6 +94,9 @@ if [ -z "$FREVANA_HOME" ]; then
     print_info "FREVANA_HOME not set, using default: $FREVANA_HOME"
 fi
 
+# Export FREVANA_HOME so child processes can use it
+export FREVANA_HOME
+
 # Ensure FREVANA_HOME directories exist
 mkdir -p "$FREVANA_HOME"/bin
 
@@ -195,13 +198,43 @@ fi
 
 print_info "Prerequisites for $MCP_ID: $PREREQS"
 
-# Function to check if a command exists
+# Environment check script URL
+ENV_CHECK_URL="$BASE_URL/tools/environment-check.sh"
+
+# Function to check if a command exists using environment-check.sh
 check_command() {
     local cmd="$1"
-    local path="$FREVANA_HOME/bin/$cmd"
+    local min_version="${2:-}"  # Optional minimum version
+    local check_result=""
     
-    if [ -f "$path" ] && [ -x "$path" ]; then
-        return 0
+    print_info "Checking $cmd with environment-check.sh..."
+    
+    # Use environment-check.sh to check the command
+    if [ -n "$min_version" ]; then
+        check_result=$(bash -c "$(curl -fsSL "$ENV_CHECK_URL")" -- --command="$cmd" --min-version="$min_version" 2>/dev/null)
+    else
+        check_result=$(bash -c "$(curl -fsSL "$ENV_CHECK_URL")" -- --command="$cmd" 2>/dev/null)
+    fi
+    
+    # Check if the command returned success (exit code 0)
+    if [ $? -eq 0 ]; then
+        # Parse the JSON result if we have jq
+        if command -v jq &> /dev/null && [ -n "$check_result" ]; then
+            local status=$(echo "$check_result" | jq -r '.status // "unknown"')
+            local version=$(echo "$check_result" | jq -r '.current_version // "unknown"')
+            local message=$(echo "$check_result" | jq -r '.message // ""')
+            
+            if [ "$status" = "ready" ]; then
+                print_success "✓ $cmd is ready (version: $version)"
+                return 0
+            else
+                print_info "Status: $message"
+                return 1
+            fi
+        else
+            # Fallback: just check exit code
+            return 0
+        fi
     else
         return 1
     fi
@@ -231,8 +264,7 @@ install_dependency() {
             ;;
     esac
     
-    # Download and execute installer with FREVANA_HOME exported
-    export FREVANA_HOME="$FREVANA_HOME"
+    # Download and execute installer (FREVANA_HOME already exported)
     if command -v curl &> /dev/null; then
         bash -c "$(curl -fsSL "$url")"
     elif command -v wget &> /dev/null; then
@@ -253,16 +285,22 @@ for prereq in "${PREREQ_ARRAY[@]}"; do
     
     print_info "Checking for $prereq..."
     
-    # Map prerequisite to actual command to check
+    # Map prerequisite to actual command and minimum version to check
+    check_cmd=""
+    min_version=""
+    
     case "$prereq" in
         node)
             check_cmd="node"
+            min_version="18.0.0"
             ;;
         python)
             check_cmd="python3"
+            min_version=""
             ;;
         uv)
             check_cmd="uv"
+            min_version=""
             ;;
         *)
             print_error "Unknown prerequisite: $prereq"
@@ -270,22 +308,44 @@ for prereq in "${PREREQ_ARRAY[@]}"; do
             ;;
     esac
     
-    if check_command "$check_cmd"; then
-        print_success " $prereq is installed"
-    else
-        print_error " $prereq is not installed"
-        
-        if [ "$INSTALL_FLAG" = true ]; then
-            print_info "Installing $prereq..."
-            if install_dependency "$prereq"; then
-                print_success " $prereq installed successfully"
+    # Check command with minimum version if specified
+    if [ -n "$min_version" ]; then
+        if check_command "$check_cmd" "$min_version"; then
+            print_success "✓ $prereq is installed"
+        else
+            print_error "✗ $prereq is not installed or version requirement not met"
+            
+            if [ "$INSTALL_FLAG" = true ]; then
+                print_info "Installing $prereq..."
+                if install_dependency "$prereq"; then
+                    print_success "✓ $prereq installed successfully"
+                else
+                    print_error "Failed to install $prereq"
+                    exit 1
+                fi
             else
-                print_error "Failed to install $prereq"
+                print_error "Please install $prereq or run with --install flag"
                 exit 1
             fi
+        fi
+    else
+        if check_command "$check_cmd"; then
+            print_success "✓ $prereq is installed"
         else
-            print_error "Please install $prereq or run with --install flag"
-            exit 1
+            print_error "✗ $prereq is not installed"
+            
+            if [ "$INSTALL_FLAG" = true ]; then
+                print_info "Installing $prereq..."
+                if install_dependency "$prereq"; then
+                    print_success "✓ $prereq installed successfully"
+                else
+                    print_error "Failed to install $prereq"
+                    exit 1
+                fi
+            else
+                print_error "Please install $prereq or run with --install flag"
+                exit 1
+            fi
         fi
     fi
 done
@@ -294,7 +354,7 @@ print_info "All prerequisites satisfied. Running MCP script..."
 
 # Execute the MCP script
 if bash "$MCP_SCRIPT"; then
-    print_success " MCP $MCP_ID installed successfully!"
+    print_success "✓ MCP $MCP_ID installed successfully!"
 else
     print_error "Failed to install MCP $MCP_ID"
     exit 1
