@@ -46,7 +46,7 @@ fi
 
 # Check if chrome-automation-mcp-lite is installed
 if [ ! -f "$CHROME_CMD" ]; then
-    $NPM_CMD install -g chrome-automation-mcp-lite
+    $NPM_CMD install chrome-automation-mcp
 fi
 
 echo "Chrome Automation MCP installed"
