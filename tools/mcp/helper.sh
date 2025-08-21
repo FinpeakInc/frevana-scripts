@@ -278,23 +278,42 @@ install_dependency() {
         return 1
     fi
     
-    # Check if installation was successful by parsing JSON result
+    # Check if installation was successful
+    local exit_code=$?
+    
+    # Try to parse JSON result if available and valid
     if command -v jq &> /dev/null && [ -n "$install_result" ]; then
-        local success=$(echo "$install_result" | jq -r '.success // false')
-        if [ "$success" = "true" ]; then
-            # Add to installed dependencies list
-            if [ -z "$INSTALLED_DEPENDENCIES" ]; then
-                INSTALLED_DEPENDENCIES="$dep"
+        # Check if the result is valid JSON
+        if echo "$install_result" | jq empty >/dev/null 2>&1; then
+            local success=$(echo "$install_result" | jq -r '.success // false' 2>/dev/null)
+            if [ "$success" = "true" ]; then
+                # Add to installed dependencies list
+                if [ -z "$INSTALLED_DEPENDENCIES" ]; then
+                    INSTALLED_DEPENDENCIES="$dep"
+                else
+                    INSTALLED_DEPENDENCIES="$INSTALLED_DEPENDENCIES,$dep"
+                fi
+                return 0
             else
-                INSTALLED_DEPENDENCIES="$INSTALLED_DEPENDENCIES,$dep"
+                return 1
             fi
-            return 0
         else
-            return 1
+            # Not valid JSON, fallback to exit code
+            log_verbose "Non-JSON output from $dep installer, using exit code"
+            if [ $exit_code -eq 0 ]; then
+                if [ -z "$INSTALLED_DEPENDENCIES" ]; then
+                    INSTALLED_DEPENDENCIES="$dep"
+                else
+                    INSTALLED_DEPENDENCIES="$INSTALLED_DEPENDENCIES,$dep"
+                fi
+                return 0
+            else
+                return 1
+            fi
         fi
     else
         # Fallback: check exit code
-        if [ $? -eq 0 ]; then
+        if [ $exit_code -eq 0 ]; then
             if [ -z "$INSTALLED_DEPENDENCIES" ]; then
                 INSTALLED_DEPENDENCIES="$dep"
             else
