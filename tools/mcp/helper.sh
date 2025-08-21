@@ -13,48 +13,54 @@ URL_PYTHON="$BASE_URL/installers/install-python.sh"
 URL_HOMEBREW="$BASE_URL/installers/install-homebrew.sh"
 URL_UV="$BASE_URL/installers/install-uv.sh"
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Global variables
+VERBOSE=false
+MCP_ID=""
+INSTALL_FLAG=false
+MCP_NAME=""
+MCP_DESCRIPTION=""
+MCP_AUTHOR=""
+MCP_PACKAGER=""
+MCP_PACKAGE=""
+MCP_PREREQUISITES=""
+INSTALLED_DEPENDENCIES=""
+FREVANA_HOME=""
 
-# Function to print colored output
-print_error() {
-    echo -e "${RED}Error: $1${NC}" >&2
+# JSON output function
+output_json() {
+    local success="$1"
+    local message="$2"
+    local mcp_id="${3:-$MCP_ID}"
+    local mcp_name="${4:-$MCP_NAME}"
+    local dependencies="${5:-$INSTALLED_DEPENDENCIES}"
+    local install_path="${6:-$FREVANA_HOME}"
+    
+    cat <<EOF
+{
+  "success": $success,
+  "message": "$message",
+  "mcp_id": "$mcp_id",
+  "mcp_name": "$mcp_name",
+  "dependencies_installed": "$dependencies",
+  "install_path": "$install_path"
+}
+EOF
 }
 
-print_success() {
-    echo -e "${GREEN}$1${NC}"
-}
-
-print_info() {
-    echo -e "${YELLOW}$1${NC}"
-}
-
-print_verbose() {
+# Verbose logging (only when --verbose is enabled)
+log_verbose() {
     if [ "$VERBOSE" = true ]; then
-        echo -e "${YELLOW}[VERBOSE] $1${NC}"
+        echo "[VERBOSE] $1" >&2
     fi
 }
 
-# Function to display usage
+# Function to display usage and exit with JSON
 usage() {
-    echo "Usage: $0 --mcp-id=<MCP_ID> [--install] [--verbose]"
-    echo ""
-    echo "Options:"
-    echo "  --mcp-id=<MCP_ID>   Required. The MCP ID to install/configure"
-    echo "  --install           Optional. Install missing dependencies automatically"
-    echo "  --verbose           Optional. Show detailed output and debug information"
-    echo ""
+    output_json "false" "Usage: $0 --mcp-id=<MCP_ID> [--install] [--verbose]"
     exit 1
 }
 
 # Parse command line arguments
-MCP_ID=""
-INSTALL_FLAG=false
-VERBOSE=false
-
 while [[ $# -gt 0 ]]; do
     case $1 in
         --mcp-id=*)
@@ -73,16 +79,16 @@ while [[ $# -gt 0 ]]; do
             usage
             ;;
         *)
-            print_error "Unknown option: $1"
-            usage
+            output_json "false" "Unknown option: $1"
+            exit 1
             ;;
     esac
 done
 
 # Check if MCP_ID is provided
 if [ -z "$MCP_ID" ]; then
-    print_error "MCP ID is required"
-    usage
+    output_json "false" "MCP ID is required"
+    exit 1
 fi
 
 # Get default FREVANA_HOME based on OS
@@ -103,7 +109,7 @@ get_default_frevana_home() {
 # Set FREVANA_HOME if not already set
 if [ -z "$FREVANA_HOME" ]; then
     FREVANA_HOME=$(get_default_frevana_home)
-    print_info "FREVANA_HOME not set, using default: $FREVANA_HOME"
+    log_verbose "FREVANA_HOME not set, using default: $FREVANA_HOME"
 fi
 
 # Export FREVANA_HOME so child processes can use it
@@ -112,17 +118,17 @@ export FREVANA_HOME
 # Ensure FREVANA_HOME directories exist
 mkdir -p "$FREVANA_HOME"/bin
 
-print_info "Processing MCP: $MCP_ID"
-print_verbose "FREVANA_HOME: $FREVANA_HOME"
-print_verbose "Install flag: $INSTALL_FLAG"
-print_verbose "Verbose mode: $VERBOSE"
+log_verbose "Processing MCP: $MCP_ID"
+log_verbose "FREVANA_HOME: $FREVANA_HOME"
+log_verbose "Install flag: $INSTALL_FLAG"
+log_verbose "Verbose mode: $VERBOSE"
 
 # Function to fetch MCP configuration from marketplace
 fetch_mcp_config() {
     local mcp_id="$1"
     local config_json=""
     
-    print_verbose "Fetching MCP configuration from marketplace..."
+    log_verbose "Fetching MCP configuration from marketplace..."
     
     # Download the marketplace config
     if command -v curl &> /dev/null; then
@@ -130,34 +136,31 @@ fetch_mcp_config() {
     elif command -v wget &> /dev/null; then
         config_json=$(wget -qO- "$MCP_MARKETPLACE_CONFIG" 2>/dev/null)
     else
-        print_error "Neither curl nor wget found. Cannot fetch configuration."
         return 1
     fi
     
     if [ -z "$config_json" ]; then
-        print_error "Failed to fetch marketplace configuration"
         return 1
     fi
     
     # Extract configuration for specific MCP ID using jq if available, otherwise use grep/sed
     if command -v jq &> /dev/null; then
-        MCP_CONFIG=$(echo "$config_json" | jq ".[] | select(.id == \"$mcp_id\")")
-        if [ -z "$MCP_CONFIG" ]; then
-            print_error "MCP ID not found in marketplace: $mcp_id"
+        local mcp_config=$(echo "$config_json" | jq ".[] | select(.id == \"$mcp_id\")")
+        if [ -z "$mcp_config" ]; then
             return 1
         fi
         
         # Extract useful information
-        MCP_NAME=$(echo "$MCP_CONFIG" | jq -r '.name // ""')
-        MCP_DESCRIPTION=$(echo "$MCP_CONFIG" | jq -r '.description // ""')
-        MCP_AUTHOR=$(echo "$MCP_CONFIG" | jq -r '.author // ""')
-        MCP_PACKAGER=$(echo "$MCP_CONFIG" | jq -r '.packager // ""')
-        MCP_PACKAGE=$(echo "$MCP_CONFIG" | jq -r '.package_name // ""')
-        MCP_PREREQUISITES=$(echo "$MCP_CONFIG" | jq -r '.prerequisites[]' 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+        MCP_NAME=$(echo "$mcp_config" | jq -r '.name // ""')
+        MCP_DESCRIPTION=$(echo "$mcp_config" | jq -r '.description // ""')
+        MCP_AUTHOR=$(echo "$mcp_config" | jq -r '.author // ""')
+        MCP_PACKAGER=$(echo "$mcp_config" | jq -r '.packager // ""')
+        MCP_PACKAGE=$(echo "$mcp_config" | jq -r '.package_name // ""')
+        MCP_PREREQUISITES=$(echo "$mcp_config" | jq -r '.prerequisites[]' 2>/dev/null | tr '\n' ',' | sed 's/,$//')
         
-        print_success "Found MCP: $MCP_NAME by $MCP_AUTHOR"
+        log_verbose "Found MCP: $MCP_NAME by $MCP_AUTHOR"
     else
-        print_verbose "jq not found, using basic parsing"
+        log_verbose "jq not found, using basic parsing"
         # Basic parsing without jq (less reliable but works for simple cases)
         MCP_NAME=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"name"' | head -1 | sed 's/.*"name".*:.*"\([^"]*\)".*/\1/')
         MCP_PACKAGER=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"packager"' | head -1 | sed 's/.*"packager".*:.*"\([^"]*\)".*/\1/')
@@ -165,11 +168,10 @@ fetch_mcp_config() {
         MCP_PREREQUISITES=$(echo "$config_json" | grep -A20 "\"id\".*\"$mcp_id\"" | grep '"prerequisites"' -A5 | grep '"' | grep -v 'prerequisites' | sed 's/.*"\([^"]*\)".*/\1/' | tr '\n' ',' | sed 's/,$//')
         
         if [ -z "$MCP_NAME" ]; then
-            print_error "MCP ID not found in marketplace: $mcp_id"
             return 1
         fi
         
-        print_success "Found MCP: $MCP_NAME"
+        log_verbose "Found MCP: $MCP_NAME"
     fi
     
     return 0
@@ -177,11 +179,10 @@ fetch_mcp_config() {
 
 # Try to fetch MCP config from marketplace (optional - continue even if it fails)
 if fetch_mcp_config "$MCP_ID"; then
-    print_verbose "Using marketplace configuration for $MCP_NAME"
+    log_verbose "Using marketplace configuration for $MCP_NAME"
 else
-    print_verbose "Continuing with local script configuration"
+    log_verbose "Continuing with local script configuration"
 fi
-
 
 # Path to specific MCP script
 MCP_SCRIPT="$BASE_URL/tools/mcp/$MCP_ID.sh"
@@ -189,18 +190,18 @@ MCP_SCRIPT="$BASE_URL/tools/mcp/$MCP_ID.sh"
 # Extract prerequisites - prefer marketplace config, fallback to script
 if [ -n "$MCP_PREREQUISITES" ]; then
     PREREQS="$MCP_PREREQUISITES"
-    print_verbose "Using prerequisites from marketplace: $PREREQS"
+    log_verbose "Using prerequisites from marketplace: $PREREQS"
 else
-    PREREQS=$(curl -fsSL "$MCP_SCRIPT" | grep "^# command_preq:" | sed 's/# command_preq: //')
-    print_verbose "Using prerequisites from script: $PREREQS"
+    PREREQS=$(curl -fsSL "$MCP_SCRIPT" 2>/dev/null | grep "^# command_preq:" | sed 's/# command_preq: //')
+    log_verbose "Using prerequisites from script: $PREREQS"
 fi
 
 if [ -z "$PREREQS" ]; then
-    print_error "No prerequisites found for $MCP_ID"
+    output_json "false" "No prerequisites found for $MCP_ID"
     exit 1
 fi
 
-print_verbose "Prerequisites for $MCP_ID: $PREREQS"
+log_verbose "Prerequisites for $MCP_ID: $PREREQS"
 
 # Environment check script URL
 ENV_CHECK_URL="$BASE_URL/tools/environment-check.sh"
@@ -211,7 +212,7 @@ check_command() {
     local min_version="${2:-}"  # Optional minimum version
     local check_result=""
     
-    print_verbose "Checking $cmd with environment-check.sh..."
+    log_verbose "Checking $cmd with environment-check.sh..."
     
     # Use environment-check.sh to check the command
     if [ -n "$min_version" ]; then
@@ -229,10 +230,10 @@ check_command() {
             local message=$(echo "$check_result" | jq -r '.message // ""')
             
             if [ "$status" = "ready" ]; then
-                print_success "✓ $cmd is ready (version: $version)"
+                log_verbose "$cmd is ready (version: $version)"
                 return 0
             else
-                print_verbose "Status: $message"
+                log_verbose "Status: $message"
                 return 1
             fi
         else
@@ -252,42 +253,68 @@ install_dependency() {
     case "$dep" in
         node)
             url="$URL_NODE"
-            print_verbose "Installing Node.js..."
+            log_verbose "Installing Node.js..."
             ;;
         python)
             url="$URL_PYTHON"
-            print_verbose "Installing Python..."
+            log_verbose "Installing Python..."
             ;;
         uv)
             url="$URL_UV"
-            print_verbose "Installing uv..."
+            log_verbose "Installing uv..."
             ;;
         *)
-            print_error "Unknown dependency: $dep"
             return 1
             ;;
     esac
     
     # Download and execute installer (FREVANA_HOME already exported)
+    local install_result=""
     if command -v curl &> /dev/null; then
-        bash -c "$(curl -fsSL "$url")"
+        install_result=$(bash -c "$(curl -fsSL "$url")" 2>/dev/null)
     elif command -v wget &> /dev/null; then
-        bash -c "$(wget -qO- "$url")"
+        install_result=$(bash -c "$(wget -qO- "$url")" 2>/dev/null)
     else
-        print_error "Neither curl nor wget found. Cannot download installer."
         return 1
     fi
     
-    return $?
+    # Check if installation was successful by parsing JSON result
+    if command -v jq &> /dev/null && [ -n "$install_result" ]; then
+        local success=$(echo "$install_result" | jq -r '.success // false')
+        if [ "$success" = "true" ]; then
+            # Add to installed dependencies list
+            if [ -z "$INSTALLED_DEPENDENCIES" ]; then
+                INSTALLED_DEPENDENCIES="$dep"
+            else
+                INSTALLED_DEPENDENCIES="$INSTALLED_DEPENDENCIES,$dep"
+            fi
+            return 0
+        else
+            return 1
+        fi
+    else
+        # Fallback: check exit code
+        if [ $? -eq 0 ]; then
+            if [ -z "$INSTALLED_DEPENDENCIES" ]; then
+                INSTALLED_DEPENDENCIES="$dep"
+            else
+                INSTALLED_DEPENDENCIES="$INSTALLED_DEPENDENCIES,$dep"
+            fi
+            return 0
+        else
+            return 1
+        fi
+    fi
 }
 
 # Check and install prerequisites
+FAILED_DEPENDENCIES=""
 IFS=',' read -ra PREREQ_ARRAY <<< "$PREREQS"
 for prereq in "${PREREQ_ARRAY[@]}"; do
     # Trim whitespace
     prereq=$(echo "$prereq" | xargs)
     
-    print_verbose "Checking for $prereq..."
+    log_verbose "Checking for $prereq..."
     
     # Map prerequisite to actual command and minimum version to check
     check_cmd=""
@@ -307,7 +334,7 @@ for prereq in "${PREREQ_ARRAY[@]}"; do
             min_version=""
             ;;
         *)
-            print_error "Unknown prerequisite: $prereq"
+            FAILED_DEPENDENCIES="$FAILED_DEPENDENCIES,unknown:$prereq"
             continue
             ;;
     esac
@@ -315,58 +342,89 @@ for prereq in "${PREREQ_ARRAY[@]}"; do
     # Check command with minimum version if specified
     if [ -n "$min_version" ]; then
         if check_command "$check_cmd" "$min_version"; then
-            print_success "✓ $prereq is installed"
+            log_verbose "$prereq is installed"
         else
-            print_error "✗ $prereq is not installed or version requirement not met"
+            log_verbose "$prereq is not installed or version requirement not met"
             
             if [ "$INSTALL_FLAG" = true ]; then
-                print_info "Installing $prereq..."
+                log_verbose "Installing $prereq..."
                 if install_dependency "$prereq"; then
-                    print_success "✓ $prereq installed successfully"
+                    log_verbose "$prereq installed successfully"
                 else
-                    print_error "Failed to install $prereq"
-                    exit 1
+                    if [ -z "$FAILED_DEPENDENCIES" ]; then
+                        FAILED_DEPENDENCIES="$prereq"
+                    else
+                        FAILED_DEPENDENCIES="$FAILED_DEPENDENCIES,$prereq"
+                    fi
                 fi
             else
-                print_error "Please install $prereq or run with --install flag"
-                exit 1
+                if [ -z "$FAILED_DEPENDENCIES" ]; then
+                    FAILED_DEPENDENCIES="$prereq"
+                else
+                    FAILED_DEPENDENCIES="$FAILED_DEPENDENCIES,$prereq"
+                fi
             fi
         fi
     else
         if check_command "$check_cmd"; then
-            print_success "✓ $prereq is installed"
+            log_verbose "$prereq is installed"
         else
-            print_error "✗ $prereq is not installed"
+            log_verbose "$prereq is not installed"
             
             if [ "$INSTALL_FLAG" = true ]; then
-                print_info "Installing $prereq..."
+                log_verbose "Installing $prereq..."
                 if install_dependency "$prereq"; then
-                    print_success "✓ $prereq installed successfully"
+                    log_verbose "$prereq installed successfully"
                 else
-                    print_error "Failed to install $prereq"
-                    exit 1
+                    if [ -z "$FAILED_DEPENDENCIES" ]; then
+                        FAILED_DEPENDENCIES="$prereq"
+                    else
+                        FAILED_DEPENDENCIES="$FAILED_DEPENDENCIES,$prereq"
+                    fi
                 fi
             else
-                print_error "Please install $prereq or run with --install flag"
-                exit 1
+                if [ -z "$FAILED_DEPENDENCIES" ]; then
+                    FAILED_DEPENDENCIES="$prereq"
+                else
+                    FAILED_DEPENDENCIES="$FAILED_DEPENDENCIES,$prereq"
+                fi
             fi
         fi
     fi
 done
 
-print_verbose "All prerequisites satisfied."
+# Check if any dependencies failed
+if [ -n "$FAILED_DEPENDENCIES" ]; then
+    if [ "$INSTALL_FLAG" = true ]; then
+        output_json "false" "Failed to install dependencies: $FAILED_DEPENDENCIES"
+    else
+        output_json "false" "Missing dependencies: $FAILED_DEPENDENCIES. Use --install flag to install automatically"
+    fi
+    exit 1
+fi
+
+log_verbose "All prerequisites satisfied."
 
 # Execute the MCP script only if --install flag is provided
 if [ "$INSTALL_FLAG" = true ]; then
-    print_verbose "Running MCP installation script..."
-    if bash -c "$(curl -fsSL "$MCP_SCRIPT")"; then
-        print_success "✓ MCP $MCP_ID installed successfully!"
+    log_verbose "Running MCP installation script..."
+    local mcp_install_result=""
+    if command -v curl &> /dev/null; then
+        mcp_install_result=$(bash -c "$(curl -fsSL "$MCP_SCRIPT")" 2>/dev/null)
+    elif command -v wget &> /dev/null; then
+        mcp_install_result=$(bash -c "$(wget -qO- "$MCP_SCRIPT")" 2>/dev/null)
     else
-        print_error "Failed to install MCP $MCP_ID"
+        output_json "false" "Neither curl nor wget found. Cannot download MCP script"
+        exit 1
+    fi
+    
+    # Check if MCP installation was successful
+    if [ $? -eq 0 ]; then
+        output_json "true" "MCP $MCP_ID installed successfully" "$MCP_ID" "$MCP_NAME" "$INSTALLED_DEPENDENCIES" "$FREVANA_HOME"
+    else
+        output_json "false" "Failed to install MCP $MCP_ID"
         exit 1
     fi
 else
-    print_info "Prerequisites check completed. Use --install to run MCP installation."
+    output_json "true" "Prerequisites check completed. Use --install to run MCP installation" "$MCP_ID" "$MCP_NAME" "" "$FREVANA_HOME"
 fi
-
-print_success "Done!"
