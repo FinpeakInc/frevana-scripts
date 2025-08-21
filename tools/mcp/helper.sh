@@ -186,8 +186,8 @@ fi
 # Path to specific MCP script
 MCP_SCRIPT="$BASE_URL/tools/mcp/$MCP_ID.sh"
 
-# Check if MCP script exists
-if [ ! -f "$MCP_SCRIPT" ]; then
+# Check if MCP script exists (using HTTP status check for URL)
+if ! curl -s --head "$MCP_SCRIPT" | head -n 1 | grep -q "200 OK"; then
     print_error "MCP script not found: $MCP_SCRIPT"
     print_error "Invalid MCP ID: $MCP_ID"
     exit 1
@@ -198,7 +198,7 @@ if [ -n "$MCP_PREREQUISITES" ]; then
     PREREQS="$MCP_PREREQUISITES"
     print_verbose "Using prerequisites from marketplace: $PREREQS"
 else
-    PREREQS=$(grep "^# command_preq:" "$MCP_SCRIPT" | sed 's/# command_preq: //')
+    PREREQS=$(curl -fsSL "$MCP_SCRIPT" | grep "^# command_preq:" | sed 's/# command_preq: //')
     print_verbose "Using prerequisites from script: $PREREQS"
 fi
 
@@ -366,7 +366,7 @@ print_verbose "All prerequisites satisfied."
 # Execute the MCP script only if --install flag is provided
 if [ "$INSTALL_FLAG" = true ]; then
     print_verbose "Running MCP installation script..."
-    if bash "$MCP_SCRIPT"; then
+    if bash -c "$(curl -fsSL "$MCP_SCRIPT")"; then
         print_success "✓ MCP $MCP_ID installed successfully!"
     else
         print_error "Failed to install MCP $MCP_ID"
