@@ -427,7 +427,7 @@ log_verbose "All prerequisites satisfied."
 # Execute the MCP script only if --install flag is provided
 if [ "$INSTALL_FLAG" = true ]; then
     log_verbose "Running MCP installation script..."
-    local mcp_install_result=""
+    mcp_install_result=""
     if command -v curl &> /dev/null; then
         mcp_install_result=$(bash -c "$(curl -fsSL "$MCP_SCRIPT")" 2>/dev/null)
     elif command -v wget &> /dev/null; then
