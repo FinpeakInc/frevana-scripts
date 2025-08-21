@@ -67,9 +67,9 @@ if [ ! -f "$NPX_CMD" ]; then
 fi
 
 # Pre-install calendly-mcp-server package to avoid installation delay during runtime
-echo "Installing calendly-mcp-server package..."
-$NPM_CMD install calendly-mcp-server || {
-    echo "Warning: Failed to pre-install calendly-mcp-server package. It will be installed on first use."
-}
+# echo "Installing calendly-mcp-server package..."
+# $NPM_CMD install calendly-mcp-server || {
+#     echo "Warning: Failed to pre-install calendly-mcp-server package. It will be installed on first use."
+# }
 
 echo "MCP Calendly installed"

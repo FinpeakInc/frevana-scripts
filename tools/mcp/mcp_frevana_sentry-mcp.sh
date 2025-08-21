@@ -77,9 +77,9 @@ if [ ! -f "$NPX_CMD" ]; then
 fi
 
 # Pre-install @sentry/mcp-server package to avoid installation delay during runtime
-echo "Installing @sentry/mcp-server package..."
-$NPM_CMD install @sentry/mcp-server || {
-    echo "Warning: Failed to pre-install @sentry/mcp-server package. It will be installed on first use."
-}
+# echo "Installing @sentry/mcp-server package..."
+# $NPM_CMD install @sentry/mcp-server || {
+#     echo "Warning: Failed to pre-install @sentry/mcp-server package. It will be installed on first use."
+# }
 
 echo "MCP Sentry installed"

@@ -69,9 +69,9 @@ if [ ! -f "$NPX_CMD" ]; then
 fi
 
 # Pre-install slack-mcp-server package to avoid installation delay during runtime
-echo "Installing slack-mcp-server package..."
-$NPM_CMD install slack-mcp-server@latest || {
-    echo "Warning: Failed to pre-install slack-mcp-server package. It will be installed on first use."
-}
+# echo "Installing slack-mcp-server package..."
+# $NPM_CMD install slack-mcp-server@latest || {
+#     echo "Warning: Failed to pre-install slack-mcp-server package. It will be installed on first use."
+# }
 
 echo "MCP Slack Server installed"

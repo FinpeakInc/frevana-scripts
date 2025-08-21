@@ -68,9 +68,9 @@ if [ ! -f "$NPX_CMD" ]; then
 fi
 
 # Pre-install @netlify/mcp package to avoid installation delay during runtime
-echo "Installing @netlify/mcp package..."
-$NPM_CMD install @netlify/mcp || {
-    echo "Warning: Failed to pre-install @netlify/mcp package. It will be installed on first use."
-}
+# echo "Installing @netlify/mcp package..."
+# $NPM_CMD install @netlify/mcp || {
+#     echo "Warning: Failed to pre-install @netlify/mcp package. It will be installed on first use."
+# }
 
 echo "MCP Netlify is ready"

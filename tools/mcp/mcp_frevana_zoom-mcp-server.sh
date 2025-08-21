@@ -78,9 +78,9 @@ if [ ! -f "$NPX_CMD" ]; then
 fi
 
 # Pre-install @yitianyigexiangfa/zoom-mcp-server package to avoid installation delay during runtime
-echo "Installing @yitianyigexiangfa/zoom-mcp-server package..."
-$NPM_CMD install @yitianyigexiangfa/zoom-mcp-server || {
-    echo "Warning: Failed to pre-install @yitianyigexiangfa/zoom-mcp-server package. It will be installed on first use."
-}
+# echo "Installing @yitianyigexiangfa/zoom-mcp-server package..."
+# $NPM_CMD install @yitianyigexiangfa/zoom-mcp-server || {
+#     echo "Warning: Failed to pre-install @yitianyigexiangfa/zoom-mcp-server package. It will be installed on first use."
+# }
 
 echo "MCP Zoom Server installed"

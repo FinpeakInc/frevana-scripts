@@ -66,9 +66,9 @@ if [ ! -f "$NPX_CMD" ]; then
 fi
 
 # Pre-install @modelcontextprotocol/server-filesystem package to avoid installation delay during runtime
-echo "Installing @modelcontextprotocol/server-filesystem package..."
-$NPM_CMD install @modelcontextprotocol/server-filesystem || {
-    echo "Warning: Failed to pre-install @modelcontextprotocol/server-filesystem package. It will be installed on first use."
-}
+# echo "Installing @modelcontextprotocol/server-filesystem package..."
+# $NPM_CMD install @modelcontextprotocol/server-filesystem || {
+#     echo "Warning: Failed to pre-install @modelcontextprotocol/server-filesystem package. It will be installed on first use."
+# }
 
 echo "MCP Server Filesystem installed"

@@ -68,9 +68,9 @@ if [ ! -f "$NPX_CMD" ]; then
 fi
 
 # Pre-install @notionhq/notion-mcp-server package to avoid installation delay during runtime
-echo "Installing @notionhq/notion-mcp-server package..."
-$NPM_CMD install @notionhq/notion-mcp-server || {
-    echo "Warning: Failed to pre-install @notionhq/notion-mcp-server package. It will be installed on first use."
-}
+# echo "Installing @notionhq/notion-mcp-server package..."
+# $NPM_CMD install @notionhq/notion-mcp-server || {
+#     echo "Warning: Failed to pre-install @notionhq/notion-mcp-server package. It will be installed on first use."
+# }
 
 echo "MCP Notion API installed"
