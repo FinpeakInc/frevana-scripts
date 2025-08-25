@@ -108,5 +108,15 @@
     "package_name": "calendly-mcp-server",
     "min_version": "",
     "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_redis-mcp",
+    "name": "Redis",
+    "description": "The official Redis MCP Server is a natural language interface designed for agentic applications to manage and search data in Redis efficiently.",
+    "author": "Redis",
+    "packager": "uv",
+    "package_name": "redis-mcp-server",
+    "min_version": "",
+    "prerequisites": ["python", "uv"]
   }
 ]
