@@ -165,7 +165,12 @@ fetch_mcp_config() {
         MCP_NAME=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"name"' | head -1 | sed 's/.*"name".*:.*"\([^"]*\)".*/\1/')
         MCP_PACKAGER=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"packager"' | head -1 | sed 's/.*"packager".*:.*"\([^"]*\)".*/\1/')
         MCP_PACKAGE=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"package_name"' | head -1 | sed 's/.*"package_name".*:.*"\([^"]*\)".*/\1/')
-        MCP_PREREQUISITES=$(echo "$config_json" | grep -A20 "\"id\".*\"$mcp_id\"" | grep '"prerequisites"' -A5 | grep '"' | grep -v 'prerequisites' | sed 's/.*"\([^"]*\)".*/\1/' | tr '\n' ',' | sed 's/,$//')
+        # Extract prerequisites more accurately - look for the array after prerequisites key
+        local prereq_line=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"prerequisites"' | head -1)
+        if [ -n "$prereq_line" ]; then
+            # Extract content between [ and ] on the prerequisites line
+            MCP_PREREQUISITES=$(echo "$prereq_line" | sed 's/.*\[\(.*\)\].*/\1/' | sed 's/"//g' | sed 's/ //g')
+        fi
         
         if [ -z "$MCP_NAME" ]; then
             return 1
