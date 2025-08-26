@@ -118,5 +118,15 @@
     "package_name": "redis-mcp-server",
     "min_version": "",
     "prerequisites": ["python", "uv"]
-  }
+  },
+  {
+    "id": "mcp_frevana_stripe-mcp",
+    "name": "Stripe",
+    "description": "Let your AI agents interact with the Stripe API by using Stripe's MCP server. Includes tools for managing customers, products, prices, invoices, payments and more.",
+    "author": "Stripe",
+    "packager": "npm",
+    "package_name": "@stripe/mcp",
+    "min_version": "",
+    "prerequisites": ["node"]
+  } 
 ]
