@@ -128,5 +128,15 @@
     "package_name": "@stripe/mcp",
     "min_version": "",
     "prerequisites": ["node"]
-  } 
+  },
+  {
+    "id": "mcp_frevana_hubspot-mcp-server",
+    "name": "HubSpot",
+    "description": "HubSpot's MCP server enables AI clients to seamlessly take HubSpot actions and interact with your HubSpot data. This opens up powerful new integration possibilities for the ecosystem.",
+    "author": "HubSpot",
+    "packager": "npm",
+    "package_name": "@hubspot/mcp-server",
+    "min_version": "",
+    "prerequisites": ["node"]
+  }
 ]
