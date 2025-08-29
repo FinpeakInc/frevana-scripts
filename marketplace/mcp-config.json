@@ -138,5 +138,15 @@
     "package_name": "@hubspot/mcp-server",
     "min_version": "",
     "prerequisites": ["node"]
+  },
+  {
+    "id": "mcp_frevana_ipinfo-mcp-server",
+    "name": "IPinfo Geolocation",
+    "description": "A Model Context Protocol server that uses the ipinfo.io API to get detailed information about an IP address. This can be used to determine where the user is located (approximately) and what network they are using.",
+    "author": "briandconnelly",
+    "packager": "uv",
+    "package_name": "mcp-server-ipinfo",
+    "min_version": "",
+    "prerequisites": ["python", "uv"]
   }
 ]
