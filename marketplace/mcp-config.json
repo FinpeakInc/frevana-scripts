@@ -148,5 +148,15 @@
     "package_name": "mcp-server-ipinfo",
     "min_version": "",
     "prerequisites": ["python", "uv"]
+  },
+  {
+    "id": "mcp_frevana_mcp-server-time",
+    "name": "Time Server",
+    "description": "A Model Context Protocol server that provides current time information. Allows AI agents to access real-time information for time-based operations and scheduling.",
+    "author": "ModelContextProtocol",
+    "packager": "uv",
+    "package_name": "mcp-server-time",
+    "min_version": "",
+    "prerequisites": ["python", "uv"]
   }
 ]
