@@ -192,6 +192,13 @@ fi
 # Path to specific MCP script
 MCP_SCRIPT="$BASE_URL/tools/mcp/$MCP_ID.sh"
 
+if curl -fsSL "$MCP_SCRIPT" --head &>/dev/null; then
+    log_verbose "MCP script found: $MCP_SCRIPT"
+else
+    log_verbose "MCP script not found: $MCP_SCRIPT, use default script"
+    MCP_SCRIPT="$BASE_URL/tools/mcp/mcp_normal.sh"
+fi
+
 # Extract prerequisites - prefer marketplace config, fallback to script
 if [ -n "$MCP_PREREQUISITES" ]; then
     PREREQS="$MCP_PREREQUISITES"

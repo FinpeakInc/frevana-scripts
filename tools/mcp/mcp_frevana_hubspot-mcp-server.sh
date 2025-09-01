@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# command_preq: node
+
 # Check if FREVANA_HOME is set
 if [ -z "$FREVANA_HOME" ]; then
     echo "Error: FREVANA_HOME environment variable is not set."
