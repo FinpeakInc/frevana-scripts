@@ -4,7 +4,7 @@
 # This script routes to appropriate MCP installation scripts based on mcp-id
 
 # Define base URLs
-BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/feat/20250903-mcp-id-api"
+BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/feat/master"
 MCP_MARKETPLACE_CONFIG="$BASE_URL/marketplace/mcp-config.json"
 
 # Define dependency installer URLs
