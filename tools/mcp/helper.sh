@@ -4,7 +4,7 @@
 # This script routes to appropriate MCP installation scripts based on mcp-id
 
 # Define base URLs
-BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/master"
+BASE_URL="https://raw.githubusercontent.com/FinpeakInc/frevana-scripts/refs/heads/feat/20250903-mcp-id-api"
 MCP_MARKETPLACE_CONFIG="$BASE_URL/marketplace/mcp-config.json"
 
 # Define dependency installer URLs
@@ -25,6 +25,20 @@ MCP_PACKAGE=""
 MCP_PREREQUISITES=""
 INSTALLED_DEPENDENCIES=""
 FREVANA_HOME=""
+
+
+# Define API endpoint templates
+FREVANA_ENV=${FREVANA_ENV:-dev}
+DEV_API_BASE_URL="https://api-dev.frevana.com"
+PROD_API_BASE_URL="https://api.frevana.com"
+API_BASE_URL=""
+
+# Function to generate BASE_URL based on MCP_ID
+if [ "$FREVANA_ENV" = "production" ]; then
+    API_BASE_URL="$PROD_API_BASE_URL"
+else
+    API_BASE_URL="$DEV_API_BASE_URL"
+fi
 
 # JSON output function
 output_json() {
@@ -127,25 +141,51 @@ log_verbose "Verbose mode: $VERBOSE"
 fetch_mcp_config() {
     local mcp_id="$1"
     local config_json=""
+    local primary_config="$API_BASE_URL/mcp/mcp-id/$mcp_id"
+    local fallback_config="$MCP_MARKETPLACE_CONFIG"
     
     log_verbose "Fetching MCP configuration from marketplace..."
+    log_verbose "Primary config URL: $primary_config"
     
-    # Download the marketplace config
+    # Try primary config first (generated from BASE_URL)
     if command -v curl &> /dev/null; then
-        config_json=$(curl -fsSL "$MCP_MARKETPLACE_CONFIG" 2>/dev/null)
+        config_json=$(curl -fsSL "$primary_config" 2>/dev/null)
     elif command -v wget &> /dev/null; then
-        config_json=$(wget -qO- "$MCP_MARKETPLACE_CONFIG" 2>/dev/null)
+        config_json=$(wget -qO- "$primary_config" 2>/dev/null)
     else
         return 1
     fi
     
+    # If primary config failed, try fallback
     if [ -z "$config_json" ]; then
+        log_verbose "Primary config failed, trying fallback: $fallback_config"
+        if command -v curl &> /dev/null; then
+            config_json=$(curl -fsSL "$fallback_config" 2>/dev/null)
+        elif command -v wget &> /dev/null; then
+            config_json=$(wget -qO- "$fallback_config" 2>/dev/null)
+        fi
+    fi
+    
+    if [ -z "$config_json" ]; then
+        log_verbose "Both primary and fallback configs failed"
         return 1
     fi
     
+    log_verbose "Successfully fetched MCP configuration"
+    
     # Extract configuration for specific MCP ID using jq if available, otherwise use grep/sed
     if command -v jq &> /dev/null; then
-        local mcp_config=$(echo "$config_json" | jq ".[] | select(.id == \"$mcp_id\")")
+        # Check if response is an array or single object
+        local is_array=$(echo "$config_json" | jq 'type == "array"')
+        
+        if [ "$is_array" = "true" ]; then
+            # Handle array format (local config file)
+            local mcp_config=$(echo "$config_json" | jq ".[] | select(.mcp_id == \"$mcp_id\")")
+        else
+            # Handle single object format (API response)
+            local mcp_config=$(echo "$config_json" | jq "select(.mcp_id == \"$mcp_id\")")
+        fi
+        
         if [ -z "$mcp_config" ]; then
             return 1
         fi
@@ -162,11 +202,11 @@ fetch_mcp_config() {
     else
         log_verbose "jq not found, using basic parsing"
         # Basic parsing without jq (less reliable but works for simple cases)
-        MCP_NAME=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"name"' | head -1 | sed 's/.*"name".*:.*"\([^"]*\)".*/\1/')
-        MCP_PACKAGER=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"packager"' | head -1 | sed 's/.*"packager".*:.*"\([^"]*\)".*/\1/')
-        MCP_PACKAGE=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"package_name"' | head -1 | sed 's/.*"package_name".*:.*"\([^"]*\)".*/\1/')
+        MCP_NAME=$(echo "$config_json" | grep -A10 "\"mcp_id\".*\"$mcp_id\"" | grep '"name"' | head -1 | sed 's/.*"name".*:.*"\([^"]*\)".*/\1/')
+        MCP_PACKAGER=$(echo "$config_json" | grep -A10 "\"mcp_id\".*\"$mcp_id\"" | grep '"packager"' | head -1 | sed 's/.*"packager".*:.*"\([^"]*\)".*/\1/')
+        MCP_PACKAGE=$(echo "$config_json" | grep -A10 "\"mcp_id\".*\"$mcp_id\"" | grep '"package_name"' | head -1 | sed 's/.*"package_name".*:.*"\([^"]*\)".*/\1/')
         # Extract prerequisites more accurately - look for the array after prerequisites key
-        local prereq_line=$(echo "$config_json" | grep -A10 "\"id\".*\"$mcp_id\"" | grep '"prerequisites"' | head -1)
+        local prereq_line=$(echo "$config_json" | grep -A10 "\"mcp_id\".*\"$mcp_id\"" | grep '"prerequisites"' | head -1)
         if [ -n "$prereq_line" ]; then
             # Extract content between [ and ] on the prerequisites line
             MCP_PREREQUISITES=$(echo "$prereq_line" | sed 's/.*\[\(.*\)\].*/\1/' | sed 's/"//g' | sed 's/ //g')
