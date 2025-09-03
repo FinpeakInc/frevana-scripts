@@ -160,7 +160,7 @@
     "prerequisites": ["python", "uv"]
   },
   {
-    "mcp_id": "mcp_frevana_mcp-server-time1",
+    "mcp_id": "test_mcp_id",
     "name": "Time Server",
     "description": "A Model Context Protocol server that provides current time information. Allows AI agents to access real-time information for time-based operations and scheduling.",
     "author": "ModelContextProtocol",
