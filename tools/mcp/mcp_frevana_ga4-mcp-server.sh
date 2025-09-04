@@ -77,10 +77,9 @@ if [ ! -f "$PIP_CMD" ]; then
 fi
 
 # Check if ga4-mcp-server is installed
-if [ ! -f "$GA4_CMD" ]; then
-    echo "Installing google-analytics-mcp..."
-    $PIP_CMD install google-analytics-mcp
-fi
+
+echo "Installing google-analytics-mcp..."
+$PIP_CMD install google-analytics-mcp
 
 echo "MCP Google Analytics Server installed"
 
