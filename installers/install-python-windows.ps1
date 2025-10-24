@@ -1,6 +1,6 @@
 param(
-    [string]$PythonVersion = '3.12.11',
-    [string]$BuildDate = '20250818',
+    [string]$PythonVersion = '3.12.5',
+    [string]$BuildDate = '20240814',
     [string]$FREVANA_HOME = "$env:USERPROFILE\.frevana",
     [switch]$Verbose
 )
@@ -34,7 +34,7 @@ try {
     }
 
     $variant = 'install_only'
-    $ext = 'zip'
+    $ext = 'tar.gz'
     $baseUrl = 'https://github.com/astral-sh/python-build-standalone/releases/download'
 
     $tmp = Join-Path $env:TEMP ([guid]::NewGuid().ToString())
@@ -74,10 +74,13 @@ try {
         throw "Failed to download Python for any supported architecture after trying: $($archList -join ', ')"
     }
 
-    # Extract
+    # Extract using tar command (Windows 10+ has tar built-in)
     $extractDir = Join-Path $tmp 'extract'
     New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
-    Expand-Archive -Path $downloadPath -DestinationPath $extractDir -Force
+    
+    # Use tar to extract .tar.gz
+    $tarExitCode = (Start-Process -FilePath 'tar' -ArgumentList '-xzf', "`"$downloadPath`"", '-C', "`"$extractDir`"" -Wait -PassThru -NoNewWindow).ExitCode
+    if ($tarExitCode -ne 0) { throw "Failed to extract tar.gz file (exit code: $tarExitCode)" }
 
     # Find the extracted folder
     $firstDir = Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1
