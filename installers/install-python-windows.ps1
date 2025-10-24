@@ -23,44 +23,55 @@ try {
     $binDir = Join-Path $FREVANA_HOME 'bin'
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 
-    # Detect architecture
+    # Detect architecture - prefer x64 for ARM64 Windows since ARM64 builds may not be available
+    # x64 Python works on ARM64 Windows via emulation
     $procArch = $env:PROCESSOR_ARCHITECTURE
+    $archList = @()
     switch ($procArch) {
-        'AMD64' { $arch = 'x86_64' }
-        'ARM64' { $arch = 'aarch64' }
-        default { $arch = 'x86_64' }
+        'AMD64' { $archList = @('x86_64') }
+        'ARM64' { $archList = @('x86_64', 'aarch64') }  # Try x64 first for better compatibility
+        default { $archList = @('x86_64') }
     }
 
-    $platform = "$arch-pc-windows-msvc-shared"
     $variant = 'install_only'
     $ext = 'zip'
-
-    $filename = "cpython-$PythonVersion+$BuildDate-$platform-$variant.$ext"
     $baseUrl = 'https://github.com/astral-sh/python-build-standalone/releases/download'
-    $url = "$baseUrl/$BuildDate/$filename"
-
-    if ($Verbose) { Write-Host "Downloading: $url" }
 
     $tmp = Join-Path $env:TEMP ([guid]::NewGuid().ToString())
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-    $downloadPath = Join-Path $tmp $filename
 
-    # Download with retries
-    $maxRetries = 3
-    $attempt = 0
+    # Try each architecture until one succeeds
     $downloaded = $false
-    while ($attempt -lt $maxRetries -and -not $downloaded) {
-        try {
-            Invoke-WebRequest -Uri $url -OutFile $downloadPath -UseBasicParsing -ErrorAction Stop
-            $downloaded = $true
-        } catch {
-            $attempt++
-            if ($attempt -lt $maxRetries) { Start-Sleep -Seconds 2 }
+    $downloadPath = ''
+    foreach ($arch in $archList) {
+        $platform = "$arch-pc-windows-msvc-shared"
+        $filename = "cpython-$PythonVersion+$BuildDate-$platform-$variant.$ext"
+        $url = "$baseUrl/$BuildDate/$filename"
+
+        if ($Verbose) { Write-Host "Trying to download: $url" }
+
+        $downloadPath = Join-Path $tmp $filename
+
+        # Download with retries
+        $maxRetries = 3
+        $attempt = 0
+        while ($attempt -lt $maxRetries -and -not $downloaded) {
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $downloadPath -UseBasicParsing -ErrorAction Stop
+                $downloaded = $true
+                if ($Verbose) { Write-Host "Successfully downloaded $arch build" }
+                break
+            } catch {
+                $attempt++
+                if ($attempt -lt $maxRetries) { Start-Sleep -Seconds 2 }
+            }
         }
+
+        if ($downloaded) { break }
     }
 
     if (-not $downloaded) {
-        throw "Failed to download $url after $maxRetries attempts"
+        throw "Failed to download Python for any supported architecture after trying: $($archList -join ', ')"
     }
 
     # Extract
