@@ -90,28 +90,29 @@ try {
     if (Test-Path $targetPythonDir) { Remove-Item -Recurse -Force $targetPythonDir }
     Move-Item -Path $firstDir.FullName -Destination $targetPythonDir
 
-    # Locate python.exe
-    $pythonExe = Get-ChildItem -Path $targetPythonDir -Filter 'python.exe' -Recurse -File | Select-Object -First 1
+    # Locate python.exe in the extracted directory
+    $pythonExe = Get-ChildItem -Path $targetPythonDir -Filter 'python.exe' -File | Select-Object -First 1
     if (-not $pythonExe) { throw 'python.exe not found in extracted content' }
 
-    # Copy python.exe and pip.exe to bin
-    Copy-Item -Path $pythonExe.FullName -Destination (Join-Path $binDir 'python.exe') -Force
-
-    $pipExe = Get-ChildItem -Path $targetPythonDir -Filter 'pip.exe' -Recurse -File | Select-Object -First 1
-    if ($pipExe) { Copy-Item -Path $pipExe.FullName -Destination (Join-Path $binDir 'pip.exe') -Force }
-
-    # Create .cmd wrappers
+    # Create wrapper scripts using UTF8 without BOM to support CJK characters
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    
     $pythonCmd = Join-Path $binDir 'python.cmd'
-    Set-Content -Path $pythonCmd -Value '@echo off`r`n"%~dp0python.exe" %*' -Encoding ASCII
+    [System.IO.File]::WriteAllText($pythonCmd, "@echo off`r`nchcp 65001 >nul`r`n`"$($pythonExe.FullName)`" %*`r`n", $utf8NoBom)
 
-    if ($pipExe) {
-        $pipCmd = Join-Path $binDir 'pip.cmd'
-        Set-Content -Path $pipCmd -Value '@echo off`r`n"%~dp0pip.exe" %*' -Encoding ASCII
-    }
+    $pythonBat = Join-Path $binDir 'python.bat'
+    [System.IO.File]::WriteAllText($pythonBat, "@echo off`r`nchcp 65001 >nul`r`n`"$($pythonExe.FullName)`" %*`r`n", $utf8NoBom)
+
+    # Create pip wrapper
+    $pipCmd = Join-Path $binDir 'pip.cmd'
+    [System.IO.File]::WriteAllText($pipCmd, "@echo off`r`nchcp 65001 >nul`r`n`"$($pythonExe.FullName)`" -m pip %*`r`n", $utf8NoBom)
+
+    $pipBat = Join-Path $binDir 'pip.bat'
+    [System.IO.File]::WriteAllText($pipBat, "@echo off`r`nchcp 65001 >nul`r`n`"$($pythonExe.FullName)`" -m pip %*`r`n", $utf8NoBom)
 
     # Output success and versions
-    $pythonVersionOut = & (Join-Path $binDir 'python.exe') --version 2>&1
-    $pipVersionOut = if (Test-Path (Join-Path $binDir 'pip.exe')) { & (Join-Path $binDir 'pip.exe') --version 2>&1 } else { (& (Join-Path $binDir 'python.exe') -ArgumentList '-m','pip','--version' 2>&1) }
+    $pythonVersionOut = & $pythonExe.FullName --version 2>&1
+    $pipVersionOut = & $pythonExe.FullName -m pip --version 2>&1
 
     Write-JsonResult $true 'Python installed' $pythonVersionOut $pipVersionOut $FREVANA_HOME
 
