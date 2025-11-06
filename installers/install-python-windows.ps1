@@ -37,6 +37,12 @@ try {
     $ext = 'tar.gz'
     $baseUrl = 'https://github.com/astral-sh/python-build-standalone/releases/download'
 
+    # Mirror defaults: allow environment override, otherwise use frevana static mirror
+    if (-not $env:FREVANA_PYTHON_MIRROR) { $env:FREVANA_PYTHON_MIRROR = 'https://static.frevana.com/installer/python' }
+    if (-not $env:PYTHON_MIRROR) { $env:PYTHON_MIRROR = 'https://static.frevana.com/installer/python' }
+    $mirrorBase = $env:FREVANA_PYTHON_MIRROR
+    if (-not $mirrorBase -and $env:PYTHON_MIRROR) { $mirrorBase = $env:PYTHON_MIRROR }
+
     $tmp = Join-Path $env:TEMP ([guid]::NewGuid().ToString())
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 
@@ -48,23 +54,38 @@ try {
         $filename = "cpython-$PythonVersion+$BuildDate-$platform-$variant.$ext"
         $url = "$baseUrl/$BuildDate/$filename"
 
-        if ($Verbose) { Write-Host "Trying to download: $url" }
+        # Prepare mirror URL (encode '+' as %2B for mirror requests)
+        $encodedFilename = $filename -replace '\+','%2B'
+        $mirrorUrl = $null
+        if ($mirrorBase) {
+            $m = $mirrorBase.TrimEnd('/')
+            $mirrorUrl = "$m/$BuildDate/$encodedFilename"
+        }
 
-        $downloadPath = Join-Path $tmp $filename
+        # Candidate URLs: primary first, then mirror
+        $candidateUrls = @($url)
+        if ($mirrorUrl) { $candidateUrls += $mirrorUrl }
 
-        # Download with retries
-        $maxRetries = 3
-        $attempt = 0
-        while ($attempt -lt $maxRetries -and -not $downloaded) {
-            try {
-                Invoke-WebRequest -Uri $url -OutFile $downloadPath -UseBasicParsing -ErrorAction Stop
-                $downloaded = $true
-                if ($Verbose) { Write-Host "Successfully downloaded $arch build" }
-                break
-            } catch {
-                $attempt++
-                if ($attempt -lt $maxRetries) { Start-Sleep -Seconds 2 }
+        foreach ($candidate in $candidateUrls) {
+            if ($Verbose) { Write-Host "Trying to download: $candidate" }
+            $downloadPath = Join-Path $tmp (Split-Path -Leaf $candidate)
+
+            # Download with retries
+            $maxRetries = 3
+            $attempt = 0
+            while ($attempt -lt $maxRetries -and -not $downloaded) {
+                try {
+                    Invoke-WebRequest -Uri $candidate -OutFile $downloadPath -UseBasicParsing -ErrorAction Stop
+                    $downloaded = $true
+                    if ($Verbose) { Write-Host "Successfully downloaded from $candidate" }
+                    break
+                } catch {
+                    $attempt++
+                    if ($attempt -lt $maxRetries) { Start-Sleep -Seconds 2 }
+                }
             }
+
+            if ($downloaded) { break }
         }
 
         if ($downloaded) { break }

@@ -10,7 +10,8 @@ set -e
 # ================================
 # Default to latest stable LTS version if not specified
 DEFAULT_NODE_VERSION="v22.18.0"  # Latest LTS as of 2024
-
+FREVANA_NODE_MIRROR="${FREVANA_NODE_MIRROR:-https://static.frevana.com/installer/node/}"
+NODEJS_MIRROR="${NODEJS_MIRROR:-https://static.frevana.com/installer/node/}"
 # ================================
 # GLOBAL VARIABLES
 # ================================
@@ -137,36 +138,68 @@ download_node() {
         log_verbose "   → Using default Node.js version: $version"
     fi
     
-    # Construct download URL
+    # Construct filename
     local filename="node-${version}-${platform}.tar.gz"
     if [[ "$platform" == "win-"* ]]; then
         filename="node-${version}-${platform}.zip"
     fi
-    local url="https://nodejs.org/dist/${version}/${filename}"
-    
+
+    # Build candidate URLs: primary first, then optional mirror(s)
+    local primary_url="https://nodejs.org/dist/${version}/${filename}"
+    local mirror_base="${FREVANA_NODE_MIRROR:-${NODEJS_MIRROR:-}}"
+
+    # Prepare URL list
+    local urls=()
+    urls+=("$primary_url")
+    if [ -n "$mirror_base" ]; then
+        # strip trailing slash from mirror_base if present
+        mirror_base="${mirror_base%/}"
+        urls+=("${mirror_base}/${version}/${filename}")
+    fi
+
     log_verbose "📥 Downloading Node.js ${version} for ${platform}..."
-    log_verbose "   → URL: $url"
-    
-    # Create temp directory
-    local temp_dir="$(mktemp -d)"
-    local download_file="${temp_dir}/${filename}"
-    
-    # Download
-    if command -v curl &> /dev/null; then
-        curl -L -o "$download_file" "$url" 2>/dev/null || {
+
+    local temp_dir=""
+    local download_file=""
+    local success=false
+
+    for url in "${urls[@]}"; do
+        log_verbose "   → Trying URL: $url"
+
+        # Create temp directory for this attempt
+        temp_dir="$(mktemp -d)"
+        download_file="${temp_dir}/${filename}"
+
+        if command -v curl &> /dev/null; then
+            if curl -fSL -o "$download_file" "$url" 2>/dev/null; then
+                success=true
+            fi
+        elif command -v wget &> /dev/null; then
+            if wget -O "$download_file" "$url" 2>/dev/null; then
+                success=true
+            fi
+        else
             rm -rf "$temp_dir"
+            output_json "false" "Neither curl nor wget is available for downloads"
             return 1
-        }
-    elif command -v wget &> /dev/null; then
-        wget -O "$download_file" "$url" 2>/dev/null || {
+        fi
+
+        if [ "$success" = true ] && [ -s "$download_file" ]; then
+            log_verbose "   → Download succeeded from: $url"
+            break
+        else
+            log_verbose "   → Download failed from: $url"
             rm -rf "$temp_dir"
-            return 1
-        }
-    else
-        rm -rf "$temp_dir"
+            temp_dir=""
+            download_file=""
+            # try next URL
+        fi
+    done
+
+    if [ "$success" != true ] || [ -z "$download_file" ]; then
         return 1
     fi
-    
+
     # Extract
     log_verbose "📦 Extracting Node.js..."
     if [[ "$filename" == *.zip ]]; then
@@ -174,20 +207,20 @@ download_node() {
     else
         tar -xzf "$download_file" -C "$temp_dir"
     fi
-    
+
     # Move to target directory
     local extracted_dir="${temp_dir}/node-${version}-${platform}"
     if [ -d "$target_dir" ]; then
         log_verbose "🗑️  Removing old Node.js installation..."
         rm -rf "$target_dir"
     fi
-    
+
     mkdir -p "$(dirname "$target_dir")"
     mv "$extracted_dir" "$target_dir"
-    
+
     # Cleanup
     rm -rf "$temp_dir"
-    
+
     log_verbose "✅ Node.js downloaded and extracted successfully!"
     return 0
 }

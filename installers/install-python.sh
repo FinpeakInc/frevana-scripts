@@ -11,6 +11,8 @@ set -e
 # Default to latest stable version if not specified
 DEFAULT_PYTHON_VERSION="3.12.11"  # Latest stable as of 2024
 DEFAULT_BUILD_DATE="20250818"  # Latest build date from python-build-standalone
+FREVANA_PYTHON_MIRROR="${FREVANA_PYTHON_MIRROR:-https://static.frevana.com/installer/python}"
+PYTHON_MIRROR="${PYTHON_MIRROR:-https://static.frevana.com/installer/python}"
 
 # ================================
 # GLOBAL VARIABLES
@@ -181,38 +183,68 @@ download_python() {
     
     # Build filename
     local filename="cpython-${version}+${date_tag}-${download_platform}-${variant}.${file_ext}"
-    local url="${base_url}/${date_tag}/${filename}"
-    
+    # Mirror paths sometimes require '+' to be percent-encoded as %2B — encode only for mirror URLs
+    local encoded_filename="${filename//+/%2B}"
+    local primary_url="${base_url}/${date_tag}/${filename}"
+    local mirror_base="${FREVANA_PYTHON_MIRROR:-${PYTHON_MIRROR:-}}"
+
+    # Prepare candidate URLs: primary first, then mirror
+    local urls=()
+    urls+=("$primary_url")
+    if [ -n "$mirror_base" ]; then
+        mirror_base="${mirror_base%/}"
+        # use percent-encoded filename for mirror to avoid + -> space or other transformations
+        urls+=("${mirror_base}/${date_tag}/${encoded_filename}")
+    fi
+
     log_verbose "📥 Downloading Python ${version} for ${platform}..."
-    log_verbose "   → URL: $url"
-    
+    log_verbose "   → Candidates: ${urls[*]}"
+
     # Create temp directory
     local temp_dir="$(mktemp -d)"
     local download_file="${temp_dir}/python.tar.gz"
-    
-    # Download with retries
+
+    # Download with retries per candidate URL
     local max_retries=3
-    local retry=0
-    
-    while [ $retry -lt $max_retries ]; do
-        if command -v curl &> /dev/null; then
-            if curl -L -f -o "$download_file" "$url" 2>/dev/null; then
-                break
+    local downloaded=false
+
+    for url in "${urls[@]}"; do
+        local attempt=0
+        while [ $attempt -lt $max_retries ]; do
+            log_verbose "   → Trying $url (attempt $((attempt + 1))/$max_retries)"
+            if command -v curl &> /dev/null; then
+                if curl -fSL -o "$download_file" "$url" 2>/dev/null; then
+                    downloaded=true
+                    break
+                fi
+            elif command -v wget &> /dev/null; then
+                if wget -O "$download_file" "$url" 2>/dev/null; then
+                    downloaded=true
+                    break
+                fi
+            else
+                rm -rf "$temp_dir"
+                return 1
             fi
-        elif command -v wget &> /dev/null; then
-            if wget -q -O "$download_file" "$url" 2>/dev/null; then
-                break
+
+            attempt=$((attempt + 1))
+            if [ $attempt -lt $max_retries ]; then
+                log_verbose "   ⚠️ Download failed from $url, retrying..."
+                sleep 2
             fi
-        fi
-        
-        retry=$((retry + 1))
-        if [ $retry -lt $max_retries ]; then
-            log_verbose "   ⚠️ Download failed, retrying... (attempt $((retry + 1))/$max_retries)"
-            sleep 2
+        done
+
+        if [ "$downloaded" = true ] && [ -s "$download_file" ]; then
+            log_verbose "   → Download succeeded from: $url"
+            break
+        else
+            log_verbose "   → Download failed from: $url"
+            # clear and try next candidate
+            rm -f "$download_file" 2>/dev/null || true
         fi
     done
-    
-    if [ $retry -eq $max_retries ]; then
+
+    if [ "$downloaded" != true ] || [ ! -s "$download_file" ]; then
         rm -rf "$temp_dir"
         return 1
     fi

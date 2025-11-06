@@ -23,6 +23,12 @@ function Write-VerboseLog($message) {
 try {
     Write-VerboseLog "FREVANA_HOME: $FREVANA_HOME"
 
+    # Mirror defaults: allow environment override, otherwise use frevana static mirror
+    if (-not $env:FREVANA_NODE_MIRROR) { $env:FREVANA_NODE_MIRROR = 'https://static.frevana.com/installer/node/' }
+    if (-not $env:NODEJS_MIRROR) { $env:NODEJS_MIRROR = 'https://static.frevana.com/installer/node/' }
+    $mirrorBase = $env:FREVANA_NODE_MIRROR
+    if (-not $mirrorBase -and $env:NODEJS_MIRROR) { $mirrorBase = $env:NODEJS_MIRROR }
+
     # Ensure frevana home and bin exist
     $binDir = Join-Path $FREVANA_HOME 'bin'
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
@@ -38,41 +44,51 @@ try {
     Write-VerboseLog "Detected architecture: $arch"
     Write-VerboseLog "Installing Node.js $NodeVersion for Windows..."
 
-    # Construct download URL
+    # Construct download filename and candidate URLs (primary then mirror)
     $platform = "win-$arch"
     $filename = "node-$NodeVersion-$platform.zip"
-    $baseUrl = 'https://nodejs.org/dist'
-    $url = "$baseUrl/$NodeVersion/$filename"
 
-    Write-VerboseLog "Download URL: $url"
+    $primaryBase = 'https://nodejs.org/dist'
+    $urls = @()
+    $urls += "$primaryBase/$NodeVersion/$filename"
+    if ($mirrorBase) {
+        $m = $mirrorBase.TrimEnd('/')
+        $urls += "$m/$NodeVersion/$filename"
+    }
+
+    Write-VerboseLog "Download candidates: $($urls -join ', ')"
 
     # Create temp directory
     $tmp = Join-Path $env:TEMP ([guid]::NewGuid().ToString())
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 
-    # Download with retries
+    # Download with retries across candidate URLs
     $downloadPath = Join-Path $tmp $filename
     $maxRetries = 3
-    $attempt = 0
     $downloaded = $false
 
-    while ($attempt -lt $maxRetries -and -not $downloaded) {
-        try {
-            Write-VerboseLog "Download attempt $($attempt + 1) of $maxRetries..."
-            Invoke-WebRequest -Uri $url -OutFile $downloadPath -UseBasicParsing -ErrorAction Stop
-            $downloaded = $true
-            Write-VerboseLog "Successfully downloaded Node.js"
-        } catch {
-            $attempt++
-            if ($attempt -lt $maxRetries) {
-                Write-VerboseLog "Download failed, retrying..."
-                Start-Sleep -Seconds 2
+    foreach ($u in $urls) {
+        $attempt = 0
+        while ($attempt -lt $maxRetries -and -not $downloaded) {
+            try {
+                Write-VerboseLog "Attempting download from $u (attempt $($attempt + 1) of $maxRetries)..."
+                Invoke-WebRequest -Uri $u -OutFile $downloadPath -UseBasicParsing -ErrorAction Stop
+                $downloaded = $true
+                Write-VerboseLog "Successfully downloaded Node.js from $u"
+            } catch {
+                $attempt++
+                Write-VerboseLog "Download from $u failed: $($_.Exception.Message)"
+                if ($attempt -lt $maxRetries) {
+                    Write-VerboseLog "Retrying..."
+                    Start-Sleep -Seconds 2
+                }
             }
         }
+        if ($downloaded) { break }
     }
 
     if (-not $downloaded) {
-        throw "Failed to download Node.js after $maxRetries attempts"
+        throw "Failed to download Node.js after trying all mirrors"
     }
 
     # Extract using Expand-Archive
